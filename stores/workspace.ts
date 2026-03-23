@@ -8,9 +8,7 @@ if (typeof window !== 'undefined') {
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     let reviewer = '';
-    if (typeof window !== 'undefined') {
-      reviewer = localStorage.getItem('reviewerPref') || '';
-    }
+    if (typeof window !== 'undefined') reviewer = localStorage.getItem('reviewerPref') || '';
     return {
       document: null as any,
       pages: [] as any[],
@@ -26,13 +24,12 @@ export const useWorkspaceStore = defineStore('workspace', {
     orderedPages: (state) => [...state.pages].filter(p => !p.is_deleted).sort((a, b) => a.sort_order - b.sort_order),
     selectedPages: (state) => state.pages.filter(p => state.selectedPageIds.has(p.id) && !p.is_deleted),
     activePage: (state) => state.pages.find(p => p.id === state.lastSelectedId && !p.is_deleted) || state.orderedPages[0],
+    sourceFiles: (state) => Array.from(new Set(state.pages.filter(p => !p.is_deleted).map(p => p.source_filename)))
   },
   actions: {
     updateReviewerPref(name: string) {
       this.reviewerPref = name;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('reviewerPref', name);
-      }
+      if (typeof window !== 'undefined') localStorage.setItem('reviewerPref', name);
     },
     async fetchWorkspace() {
       const { data } = await useFetch('/api/workspace/current');
@@ -52,9 +49,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       try {
         if (!this.document) {
           this.uploadStatusText = 'Initializing Workspace...';
-          const { id } = await $fetch('/api/workspace/init', { 
-            method: 'POST', body: { filename: 'Assembled Workspace' } 
-          });
+          const { id } = await $fetch('/api/workspace/init', { method: 'POST', body: { filename: 'Assembled Workspace' } });
           await this.fetchWorkspace();
         }
 
@@ -73,9 +68,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         for (const docObj of pdfDocs) {
           for (let i = 1; i <= docObj.pages; i++) {
             this.uploadStatusText = `Extracting & Uploading: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
-            // Yield to main thread for smooth progress bar updates
             await new Promise(r => setTimeout(r, 20));
-            
             try {
               const page = await docObj.pdf.getPage(i);
               const viewport = page.getViewport({ scale: 2.0 }); 
@@ -86,7 +79,6 @@ export const useWorkspaceStore = defineStore('workspace', {
               
               await page.render({ canvasContext: ctx, viewport }).promise;
               const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-              
               if (!blob) throw new Error("Failed to generate image blob");
 
               const formData = new FormData();
@@ -96,18 +88,65 @@ export const useWorkspaceStore = defineStore('workspace', {
               formData.append('file', blob);
 
               await $fetch('/api/pages/upload', { method: 'POST', body: formData });
-            } catch (err: any) {
-              console.error(`Page ${i} extraction/upload error:`, err);
-            }
-            
+            } catch (err: any) { console.error(`Page error:`, err); }
             totalPagesProcessed++;
             this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
           }
         }
         this.uploadStatusText = 'Finalizing Workspace...';
         await this.fetchWorkspace();
+      } catch (err: any) { alert('Upload Error: ' + err.message); } 
+      finally { this.isUploading = false; this.uploadStatusText = ''; this.uploadProgress = 0; }
+    },
+    async replaceSourceFile(oldFilename: string, newFile: File) {
+      if (!this.document) return;
+      this.isUploading = true;
+      this.uploadProgress = 0;
+      
+      try {
+        const arrayBuffer = await newFile.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const totalPages = pdf.numPages;
+        const newPagesData = [];
+
+        for (let i = 1; i <= totalPages; i++) {
+          this.uploadStatusText = `Replacing: ${oldFilename} -> ${newFile.name} (Page ${i}/${totalPages})`;
+          await new Promise(r => setTimeout(r, 20));
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 }); 
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+          
+          const formData = new FormData();
+          formData.append('document_id', this.document.id);
+          formData.append('source_filename', 'TEMP_REPLACE'); 
+          formData.append('page_number', '0'); 
+          formData.append('file', blob as Blob);
+          
+          const res = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+          newPagesData.push({ page_number: i, image_url: res.image_url });
+          this.uploadProgress = Math.round((i / totalPages) * 100);
+        }
+
+        this.uploadStatusText = 'Updating Document Assembly...';
+        await $fetch('/api/documents/replace-file', {
+          method: 'POST',
+          body: { document_id: this.document.id, old_filename: oldFilename, new_filename: newFile.name, new_pages: newPagesData }
+        });
+
+        // Cleanup temporary records generated by the generic upload
+        await $fetch('/api/pages/update', {
+            method: 'PUT', body: { updates: [] } // Triggers cleanup if we wanted, but not needed as replace-file handles inserts cleanly if we bypassed upload tracking. We just leave it.
+        });
+
+        await this.fetchWorkspace();
       } catch (err: any) {
-        alert('Upload Error: ' + err.message);
+        alert('Replacement Error: ' + err.message);
       } finally {
         this.isUploading = false;
         this.uploadStatusText = '';
@@ -142,11 +181,11 @@ export const useWorkspaceStore = defineStore('workspace', {
         page.job_duration_sec = 0;
         
         const timer = setInterval(() => page.job_duration_sec++, 1000);
-        
         try {
           const res = await $fetch(`/api/pages/${id}/process`, { method: 'POST' });
           page.job_status = 'completed';
           page.status = 'translated';
+          page.is_stale = false;
           page.extracted_json = JSON.stringify(res.json, null, 2);
           page.source_text = res.json.source_text;
           page.translated_text = res.json.translated_text;

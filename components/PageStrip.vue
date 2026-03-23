@@ -30,7 +30,13 @@
           </div>
         </div>
         
-        <div class="mt-2.5 flex flex-col px-1">
+        <div class="mt-2.5 flex flex-col px-1 relative">
+          <!-- Status Indicators -->
+          <div class="absolute -top-3.5 right-0 flex space-x-1">
+             <div v-if="page.is_stale" class="w-2.5 h-2.5 bg-yellow-500 rounded-full shadow" title="Stale content from file replacement"></div>
+             <div v-if="page.is_manual_translation" class="w-2.5 h-2.5 bg-purple-500 rounded-full shadow" title="Contains Manual Overrides"></div>
+          </div>
+          
           <div class="flex justify-between items-center mb-1">
             <span class="text-xs font-semibold text-slate-200">Page {{ page.sort_order }}</span>
             <span v-if="page.job_duration_sec" class="text-[10px] font-mono text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded">{{ page.job_duration_sec }}s</span>
@@ -88,9 +94,7 @@ const onDragStart = (e, id) => {
   draggedId.value = id;
   e.dataTransfer.effectAllowed = 'move';
 };
-const onDragEnter = (idx) => {
-  dragTargetIdx.value = idx;
-};
+const onDragEnter = (idx) => { dragTargetIdx.value = idx; };
 const onDrop = async () => {
   if (!draggedId.value || dragTargetIdx.value === null) return;
   const list = [...workspace.orderedPages];

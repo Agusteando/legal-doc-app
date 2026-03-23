@@ -10,10 +10,23 @@ export default defineEventHandler(async (event) => {
       await db.query(`UPDATE pages SET sort_order = ? WHERE id = ?`, [u.sort_order, u.id]);
     }
   } else {
-    // Single update
-    await db.query(`
-      UPDATE pages SET label = ?, rotation = ?, is_excluded = ?, extracted_json = ? WHERE id = ?
-    `, [body.label, body.rotation, body.is_excluded, body.extracted_json, body.id]);
+    // Single update with dynamic fields mapping
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (body.label !== undefined) { updates.push('label = ?'); values.push(body.label); }
+    if (body.rotation !== undefined) { updates.push('rotation = ?'); values.push(body.rotation); }
+    if (body.is_excluded !== undefined) { updates.push('is_excluded = ?'); values.push(body.is_excluded); }
+    if (body.extracted_json !== undefined) { updates.push('extracted_json = ?'); values.push(body.extracted_json); }
+    if (body.source_text !== undefined) { updates.push('source_text = ?'); values.push(body.source_text); }
+    if (body.translated_text !== undefined) { updates.push('translated_text = ?'); values.push(body.translated_text); }
+    if (body.is_manual_translation !== undefined) { updates.push('is_manual_translation = ?'); values.push(body.is_manual_translation); }
+    if (body.is_stale !== undefined) { updates.push('is_stale = ?'); values.push(body.is_stale); }
+
+    if (updates.length > 0) {
+      values.push(body.id);
+      await db.query(`UPDATE pages SET ${updates.join(', ')} WHERE id = ?`, values);
+    }
   }
   return { success: true };
 });

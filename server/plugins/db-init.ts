@@ -47,10 +47,12 @@ export default defineNitroPlugin(async () => {
       )
     `);
 
+    // Migrations for new features (ignores errors if columns already exist)
+    try { await db.query(`ALTER TABLE pages ADD COLUMN is_manual_translation BOOLEAN DEFAULT FALSE`); } catch (e) {}
+    try { await db.query(`ALTER TABLE pages ADD COLUMN is_stale BOOLEAN DEFAULT FALSE`); } catch (e) {}
+
     console.log("Database tables initialized successfully.");
   } catch (error: any) {
-    // We catch the error so the server doesn't fatally crash on Vercel boot.
-    // The API routes will naturally fail and report the issue to the client when invoked.
     console.error("Database Initialization Skipped/Failed:", error.message);
   }
 });

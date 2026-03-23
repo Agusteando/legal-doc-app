@@ -9,6 +9,9 @@
           <CpuIcon class="w-4 h-4 mr-2" /> 
           Process Selected ({{ workspace.selectedPageIds.size }})
         </button>
+        <button @click="isFilesModalOpen = true" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-md text-sm font-medium flex items-center text-slate-200 transition-colors border border-slate-600">
+          <FilesIcon class="w-4 h-4 mr-2" /> Source Files
+        </button>
       </div>
       <div class="flex items-center space-x-5">
         <Approvals />
@@ -21,39 +24,50 @@
       </div>
     </header>
 
-    <div class="flex flex-1 min-h-0">
+    <div class="flex flex-1 min-h-0 relative">
       <PageStrip class="w-[320px] border-r border-slate-700 bg-slate-800/60 flex-shrink-0" />
       <DetailView class="flex-1 min-w-0" />
+      
+      <!-- Overlay when replacing a file -->
+      <div v-if="workspace.isUploading" class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm z-40 flex flex-col items-center justify-center text-white">
+        <LoaderIcon class="w-12 h-12 text-blue-500 animate-spin mb-4" />
+        <h3 class="text-xl font-medium">{{ workspace.uploadStatusText }}</h3>
+        <div class="w-64 bg-slate-800 rounded-full h-2 mt-4 overflow-hidden">
+          <div class="bg-blue-500 h-full transition-all duration-300" :style="{ width: `${workspace.uploadProgress}%` }"></div>
+        </div>
+      </div>
     </div>
+    
+    <SourceFilesModal :isOpen="isFilesModalOpen" @close="isFilesModalOpen = false" />
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
-import { CpuIcon, DownloadIcon, LoaderIcon } from 'lucide-vue-next';
+import { CpuIcon, DownloadIcon, LoaderIcon, FilesIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import Approvals from './Approvals.vue';
 import PageStrip from './PageStrip.vue';
 import DetailView from './DetailView.vue';
+import SourceFilesModal from './SourceFilesModal.vue';
 
 const workspace = useWorkspaceStore();
 const isExporting = ref(false);
+const isFilesModalOpen = ref(false);
 
 const exportPdf = async () => {
   if (!workspace.document) return;
   isExporting.value = true;
   try {
-    const res = await $fetch(`/api/workspace/${workspace.document.id}/export`, { responseType: 'blob' });
-    const url = window.URL.createObjectURL(res);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${workspace.document.filename.replace(/\s+/g, '_')}_Export.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    // Fixed logic for Vercel: We hit the endpoint, it uploads PDF to storage and returns URL
+    const res = await $fetch(`/api/workspace/${workspace.document.id}/export`);
+    if (res.url) {
+      window.open(res.url, '_blank');
+    } else {
+      throw new Error("No URL returned from export engine.");
+    }
   } catch (err) {
-    alert("Failed to export PDF: " + err.message);
+    alert("Export Error: " + err.message);
   } finally {
     isExporting.value = false;
   }

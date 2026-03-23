@@ -1,8 +1,8 @@
 import { getDb } from '../../../utils/db';
+import { uploadToCasita } from '../../../utils/casita';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 
-// Pure renderer function isolated for Nitro backend
 function renderLayoutBlock(block: any): string {
   const align = block.alignment ? `text-align: ${block.alignment};` : 'text-align: left;';
   const content = block.translated_content || ''; 
@@ -18,11 +18,7 @@ function renderLayoutBlock(block: any): string {
     case 'list':
       const listStyle = block.alignment === 'center' ? 'list-style-position: inside;' : '';
       html += `<ul style="margin: 1rem 0; padding-left: 2rem; color: #374151; line-height: 1.7; ${align} ${listStyle}">`;
-      if (block.list_items && Array.isArray(block.list_items)) {
-        block.list_items.forEach((item: string) => {
-          html += `<li style="margin-bottom: 0.5rem;">${item}</li>`;
-        });
-      }
+      if (block.list_items && Array.isArray(block.list_items)) block.list_items.forEach((item: string) => { html += `<li style="margin-bottom: 0.5rem;">${item}</li>`; });
       html += `</ul>`;
       break;
     case 'table':
@@ -30,13 +26,11 @@ function renderLayoutBlock(block: any): string {
         html += `<table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.9rem; color: #374151;"><tbody>`;
         block.table_data.forEach((row: any, i: number) => {
           html += `<tr>`;
-          if (Array.isArray(row)) {
-            row.forEach((cell: any) => {
-              const tag = i === 0 ? 'th' : 'td';
-              const style = i === 0 ? 'border: 1px solid #9ca3af; padding: 0.75rem; background-color: #f3f4f6; font-weight: 600; color: #111827; text-align: left;' : 'border: 1px solid #d1d5db; padding: 0.75rem; text-align: left;';
-              html += `<${tag} style="${style}">${cell}</${tag}>`;
-            });
-          }
+          if (Array.isArray(row)) row.forEach((cell: any) => {
+            const tag = i === 0 ? 'th' : 'td';
+            const style = i === 0 ? 'border: 1px solid #9ca3af; padding: 0.75rem; background-color: #f3f4f6; font-weight: 600; color: #111827; text-align: left;' : 'border: 1px solid #d1d5db; padding: 0.75rem; text-align: left;';
+            html += `<${tag} style="${style}">${cell}</${tag}>`;
+          });
           html += `</tr>`;
         });
         html += `</tbody></table>`;
@@ -53,11 +47,10 @@ export default defineEventHandler(async (event) => {
 
   const [docs]: any = await db.query(`SELECT * FROM documents WHERE id = ? LIMIT 1`, [id]);
   if (!docs.length) throw createError({ statusCode: 404, statusMessage: 'Document not found' });
+  const filename = docs[0].filename.replace(/\s+/g, '_') + '_Export.pdf';
 
-  // Get active pages in sorted order
   const [pages]: any = await db.query(`
-    SELECT extracted_json 
-    FROM pages 
+    SELECT extracted_json FROM pages 
     WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
     ORDER BY sort_order ASC
   `, [id]);
@@ -68,55 +61,30 @@ export default defineEventHandler(async (event) => {
       try {
         const data = JSON.parse(page.extracted_json);
         if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
-          data.layout_blocks.forEach((block: any) => {
-            innerHtml += renderLayoutBlock(block);
-          });
+          data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
         }
         innerHtml += '<div style="page-break-after: always;"></div>';
-      } catch (e) {
-        console.error("Invalid JSON block during export", e);
-      }
+      } catch (e) {}
     }
   }
 
   const fullHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          /* Loading Merriweather for document body, and Caveat for handwritten notes */
-          @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Caveat:wght@500;700&display=swap');
-          body {
-            font-family: 'Merriweather', serif;
-            color: #111827;
-            margin: 0;
-            padding: 0;
-            font-size: 11pt;
-          }
-        </style>
-      </head>
-      <body>
-        ${innerHtml}
-      </body>
-    </html>
+    <!DOCTYPE html><html><head><meta charset="UTF-8">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Caveat:wght@500;700&display=swap');
+      body { font-family: 'Merriweather', serif; color: #111827; margin: 0; padding: 0; font-size: 11pt; }
+    </style></head><body>${innerHtml}</body></html>
   `;
 
+  let browser;
   try {
-    // Vercel serverless requires a compressed headless Chromium to run
     let executablePath = await chromium.executablePath();
-    
-    // Fallback if running locally via `npm run dev` and sparticuz hasn't cached a binary
     const isLocal = process.env.NODE_ENV === 'development';
     if (!executablePath && isLocal) {
-      executablePath = process.platform === 'win32' 
-        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
-        : process.platform === 'darwin' 
-          ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          : '/usr/bin/google-chrome';
+      executablePath = process.platform === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
     }
 
-    const browser = await puppeteer.launch({ 
+    browser = await puppeteer.launch({ 
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: executablePath,
@@ -124,24 +92,18 @@ export default defineEventHandler(async (event) => {
     });
     
     const page = await browser.newPage();
-    
-    // Changed to 'load' to prevent timeouts due to Google Fonts in Vercel
     await page.setContent(fullHtml, { waitUntil: 'load' });
-    
-    const pdfBuffer = await page.pdf({ 
-      format: 'A4', 
-      printBackground: true,
-      margin: { top: '2cm', right: '2cm', bottom: '2cm', left: '2cm' }
-    });
-    
+    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '2cm', right: '2cm', bottom: '2cm', left: '2cm' } });
     await browser.close();
 
-    setResponseHeader(event, 'Content-Type', 'application/pdf');
-    setResponseHeader(event, 'Content-Disposition', `attachment; filename="${docs[0].filename.replace(/\s+/g, '_')}_Export.pdf"`);
+    // Fix for Vercel 500 error: Instead of returning large raw buffer, upload to storage and return a URL link.
+    const pdfUrl = await uploadToCasita(Buffer.from(pdfBuffer), filename, 'application/pdf');
     
-    return pdfBuffer;
+    return { success: true, url: pdfUrl };
+
   } catch (err: any) {
+    if (browser) await browser.close();
     console.error("Puppeteer Export Error:", err);
-    throw createError({ statusCode: 500, statusMessage: 'Failed to generate PDF export: ' + err.message });
+    throw createError({ statusCode: 500, statusMessage: err.message });
   }
 });
