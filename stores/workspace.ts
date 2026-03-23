@@ -167,6 +167,20 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
       this.lastSelectedId = id;
     },
+    nextPage() {
+      if (!this.lastSelectedId) return;
+      const idx = this.orderedPages.findIndex(p => p.id === this.lastSelectedId);
+      if (idx !== -1 && idx < this.orderedPages.length - 1) {
+        this.selectPage(this.orderedPages[idx + 1].id, false, false);
+      }
+    },
+    prevPage() {
+      if (!this.lastSelectedId) return;
+      const idx = this.orderedPages.findIndex(p => p.id === this.lastSelectedId);
+      if (idx > 0) {
+        this.selectPage(this.orderedPages[idx - 1].id, false, false);
+      }
+    },
     async processSelected() {
       const ids = Array.from(this.selectedPageIds);
       for (const id of ids) {
@@ -179,7 +193,6 @@ export const useWorkspaceStore = defineStore('workspace', {
         try {
           const res = await $fetch(`/api/pages/${id}/process`, { method: 'POST' });
           page.job_status = 'completed';
-          page.status = 'translated';
           page.is_stale = false;
           page.extracted_json = JSON.stringify(res.json, null, 2);
           page.source_text = res.json.source_text;
@@ -190,6 +203,13 @@ export const useWorkspaceStore = defineStore('workspace', {
         } finally {
           clearInterval(timer);
         }
+      }
+    },
+    async updatePageInfo(id: string, updates: any) {
+      const page = this.pages.find(p => p.id === id);
+      if (page) {
+        Object.assign(page, updates);
+        await $fetch('/api/pages/update', { method: 'PUT', body: { id, ...updates } });
       }
     },
     async updatePageOrder(reorderedIds: string[]) {

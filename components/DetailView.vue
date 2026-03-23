@@ -1,5 +1,5 @@
 <template>
-  <div v-if="page" class="h-full flex flex-col bg-slate-900">
+  <div v-if="page" class="h-full flex flex-col bg-slate-900 overflow-hidden">
     <div class="h-14 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between px-5 shrink-0">
       <div class="flex items-center space-x-3">
         <h2 class="font-semibold text-slate-100 text-sm">Page {{ page.sort_order }} Inspector</h2>
@@ -9,26 +9,35 @@
         <div v-if="page.is_stale" class="bg-yellow-900/30 border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Stale / Replaced</div>
         <div v-if="page.is_manual_translation" class="bg-purple-900/30 border border-purple-500/30 text-purple-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Manual Edit</div>
       </div>
-      <div class="flex space-x-1">
-        <button @click="toggleExclude" class="p-2 rounded-md transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/30 hover:bg-red-900/50' : 'text-slate-400 hover:bg-slate-700 hover:text-white'" title="Toggle Exclude">
-          <BanIcon class="w-4 h-4" />
+      
+      <div class="flex space-x-1 items-center">
+        <button @click="toggleExclude" class="p-1.5 rounded-md transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/30 hover:bg-red-900/50' : 'text-slate-400 hover:bg-slate-700 hover:text-white'" title="Toggle Exclude">
+          <BanIcon class="w-5 h-5" />
         </button>
-        <button @click="rotate" class="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Rotate Image">
-          <RotateCwIcon class="w-4 h-4" />
+        <button @click="rotate" class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Rotate Image">
+          <RotateCwIcon class="w-5 h-5" />
         </button>
-        <div class="w-px h-6 bg-slate-600 mx-1.5 self-center"></div>
-        <button @click="deletePage" class="p-2 rounded-md text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors" title="Delete Page">
-          <TrashIcon class="w-4 h-4" />
+        <button @click="deletePage" class="p-1.5 rounded-md text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors" title="Delete Page">
+          <TrashIcon class="w-5 h-5" />
+        </button>
+        <div class="w-px h-6 bg-slate-600 mx-2"></div>
+        <button @click="workspace.prevPage()" class="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-white transition-colors" title="Previous Page">
+          <ChevronLeftIcon class="w-5 h-5" />
+        </button>
+        <button @click="workspace.nextPage()" class="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-white transition-colors" title="Next Page">
+          <ChevronRightIcon class="w-5 h-5" />
         </button>
       </div>
     </div>
 
     <div class="flex-1 flex min-h-0 relative">
-      <div class="w-1/2 border-r border-slate-700 bg-slate-950 p-6 overflow-auto flex items-center justify-center">
+      <!-- Left: Image Viewer (35%) -->
+      <div class="w-[35%] border-r border-slate-700 bg-slate-950 p-6 overflow-auto flex items-center justify-center">
         <img :src="page.image_url" class="max-w-full shadow-2xl transition-transform rounded-sm border border-slate-800" :style="{ transform: `rotate(${page.rotation}deg)` }" />
       </div>
       
-      <div class="w-1/2 flex flex-col bg-slate-900 relative">
+      <!-- Center: Extracted Content (Flex-1) -->
+      <div class="flex-1 flex flex-col bg-slate-900 border-r border-slate-700 min-w-0">
         <div class="flex border-b border-slate-700 bg-slate-800">
           <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
             class="px-5 py-3 text-sm font-medium border-b-2 transition-all outline-none"
@@ -38,11 +47,10 @@
         </div>
         
         <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 p-6 relative">
-          
           <div v-if="activeTab === 'source'" class="h-full flex flex-col">
             <div class="mb-3 flex justify-between items-center">
               <span class="text-xs text-slate-400 font-medium">Edit raw source extraction.</span>
-              <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.source ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Changes</button>
+              <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors shadow-sm" :class="dirtyFlags.source ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Changes</button>
             </div>
             <textarea v-model="localSource" class="w-full flex-1 bg-slate-950 text-slate-300 font-mono text-sm p-4 rounded-md border border-slate-700 focus:outline-none focus:border-blue-500 resize-none shadow-inner"></textarea>
           </div>
@@ -51,7 +59,7 @@
             <div class="mb-3 flex justify-between items-center">
               <span class="text-xs text-slate-400 font-medium">Edit translation. To update layout engine, click Sync after saving.</span>
               <div class="flex space-x-2">
-                <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.translated ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Text</button>
+                <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors shadow-sm" :class="dirtyFlags.translated ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Text</button>
                 <button @click="syncLayout" :disabled="dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 flex items-center shadow-sm" title="Rebuild HTML Layout blocks from this text">
                   <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" :class="{'animate-spin': isSyncing}" /> Sync Layout
                 </button>
@@ -69,11 +77,35 @@
           </div>
           
           <div v-else-if="activeTab === 'html'" class="h-full overflow-y-auto w-full flex justify-center pb-8">
-            <div class="max-w-[21cm] w-full bg-white text-black p-12 shadow-2xl rounded-sm min-h-[29.7cm]" style="font-family: 'Merriweather', serif;">
+            <div class="max-w-[21cm] w-full bg-white text-black p-12 shadow-2xl rounded-sm min-h-[29.7cm] border border-slate-200" style="font-family: 'Merriweather', serif;">
               <div v-html="renderedHtml"></div>
             </div>
           </div>
-          
+        </div>
+      </div>
+
+      <!-- Right: Inspector/Metadata (280px) -->
+      <div class="w-[280px] shrink-0 bg-slate-800 flex flex-col overflow-y-auto">
+        <div class="p-4 border-b border-slate-700 bg-slate-800/80 sticky top-0 z-10 shadow-sm">
+          <h3 class="font-semibold text-slate-100 text-sm">Page Metadata</h3>
+        </div>
+        <div class="p-5 space-y-6">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Review Status</label>
+            <select v-model="localStatus" @change="saveMetadata" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-inner font-medium" :class="{'text-emerald-400': localStatus === 'approved', 'text-red-400': localStatus === 'needs_work', 'text-amber-400': localStatus === 'pending_review'}">
+              <option value="pending_review" class="text-amber-400">Pending Review</option>
+              <option value="approved" class="text-emerald-400">Approved</option>
+              <option value="needs_work" class="text-red-400">Needs Work</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Page Label</label>
+            <input v-model="localLabel" @blur="saveMetadata" placeholder="e.g. Exhibit A" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-inner placeholder-slate-600" />
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Internal Notes</label>
+            <textarea v-model="localNotes" @blur="saveMetadata" placeholder="Add review notes or translator comments here..." class="w-full h-40 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none shadow-inner leading-relaxed placeholder-slate-600"></textarea>
+          </div>
         </div>
       </div>
     </div>
@@ -87,7 +119,7 @@
 
 <script setup>
 import { ref, computed, watch, reactive } from 'vue';
-import { LoaderIcon, BanIcon, RotateCwIcon, TrashIcon, FileTextIcon, RefreshCwIcon } from 'lucide-vue-next';
+import { LoaderIcon, BanIcon, RotateCwIcon, TrashIcon, FileTextIcon, RefreshCwIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import DOMPurify from 'dompurify';
 import { renderLayoutBlock } from '~/utils/renderer';
@@ -106,6 +138,9 @@ const tabs = [
 const localSource = ref('');
 const localTranslation = ref('');
 const localJson = ref('');
+const localStatus = ref('pending_review');
+const localLabel = ref('');
+const localNotes = ref('');
 const isSyncing = ref(false);
 
 const dirtyFlags = reactive({ source: false, translated: false, json: false });
@@ -115,6 +150,9 @@ watch(() => page.value, (p) => {
     localSource.value = p.source_text || '';
     localTranslation.value = p.translated_text || '';
     localJson.value = p.extracted_json ? JSON.stringify(JSON.parse(p.extracted_json), null, 2) : '';
+    localStatus.value = p.status || 'pending_review';
+    localLabel.value = p.label || '';
+    localNotes.value = p.notes || '';
     dirtyFlags.source = false;
     dirtyFlags.translated = false;
     dirtyFlags.json = false;
@@ -130,18 +168,24 @@ watch(localJson, (val) => {
   }
 });
 
+const saveMetadata = async () => {
+  if (!page.value) return;
+  await workspace.updatePageInfo(page.value.id, {
+    status: localStatus.value,
+    label: localLabel.value,
+    notes: localNotes.value
+  });
+};
+
 const saveSource = async () => {
   if (!page.value) return;
-  page.value.source_text = localSource.value;
-  await $fetch('/api/pages/update', { method: 'PUT', body: { id: page.value.id, source_text: localSource.value } });
+  await workspace.updatePageInfo(page.value.id, { source_text: localSource.value });
   dirtyFlags.source = false;
 };
 
 const saveTranslation = async () => {
   if (!page.value) return;
-  page.value.translated_text = localTranslation.value;
-  page.value.is_manual_translation = true;
-  await $fetch('/api/pages/update', { method: 'PUT', body: { id: page.value.id, translated_text: localTranslation.value, is_manual_translation: true } });
+  await workspace.updatePageInfo(page.value.id, { translated_text: localTranslation.value, is_manual_translation: true });
   dirtyFlags.translated = false;
 };
 
@@ -150,8 +194,7 @@ const saveJson = async () => {
   try {
     const parsed = JSON.parse(localJson.value);
     const compactJson = JSON.stringify(parsed);
-    page.value.extracted_json = compactJson;
-    await $fetch('/api/pages/update', { method: 'PUT', body: { id: page.value.id, extracted_json: compactJson } });
+    await workspace.updatePageInfo(page.value.id, { extracted_json: compactJson });
     dirtyFlags.json = false;
   } catch (e) { alert("Invalid JSON format."); }
 };
@@ -164,9 +207,9 @@ const syncLayout = async () => {
       method: 'POST',
       body: { translated_text: page.value.translated_text, source_text: page.value.source_text }
     });
-    page.value.extracted_json = JSON.stringify(res.json, null, 2);
-    localJson.value = JSON.stringify(res.json, null, 2);
-    page.value.is_stale = false;
+    const compactJson = JSON.stringify(res.json, null, 2);
+    localJson.value = compactJson;
+    await workspace.updatePageInfo(page.value.id, { extracted_json: compactJson, is_stale: false });
     dirtyFlags.json = false;
   } catch (err) {
     alert("Sync Error: " + err.message);
@@ -177,14 +220,13 @@ const syncLayout = async () => {
 
 const toggleExclude = async () => {
   if (!page.value) return;
-  page.value.is_excluded = !page.value.is_excluded;
-  await $fetch('/api/pages/update', { method: 'PUT', body: { id: page.value.id, is_excluded: page.value.is_excluded } });
+  await workspace.updatePageInfo(page.value.id, { is_excluded: !page.value.is_excluded });
 };
 
 const rotate = async () => {
   if (!page.value) return;
-  page.value.rotation = (page.value.rotation + 90) % 360;
-  await $fetch('/api/pages/update', { method: 'PUT', body: { id: page.value.id, rotation: page.value.rotation } });
+  const newRotation = (page.value.rotation + 90) % 360;
+  await workspace.updatePageInfo(page.value.id, { rotation: newRotation });
 };
 
 const deletePage = async () => {

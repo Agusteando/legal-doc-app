@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
   const nextOrder = orderRes[0].next_order;
 
   await db.query(
-    `INSERT INTO pages (id, document_id, source_filename, page_number, sort_order, image_url) VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO pages (id, document_id, source_filename, page_number, sort_order, image_url, status) VALUES (?, ?, ?, ?, ?, ?, 'pending_review')`,
     [pageId, docId, sourceFilename, pageNum, nextOrder, imageUrl]
   );
 

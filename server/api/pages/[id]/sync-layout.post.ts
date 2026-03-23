@@ -10,7 +10,7 @@ const schema = {
       items: {
         type: "object",
         properties: {
-          type: { type: "string", enum: ["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field", "handwritten_note", "list"] },
+          type: { type: "string", enum:["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field", "handwritten_note", "list"] },
           alignment: { type: "string", enum: ["left", "center", "right", "justify"] },
           source_content: { type: "string" },
           translated_content: { type: "string" },
@@ -19,12 +19,12 @@ const schema = {
           table_data: { type: "array", items: { type: "array", items: { type: "string" } } },
           list_items: { type: "array", items: { type: "string" } }
         },
-        required: ["type", "alignment", "source_content", "translated_content", "form_label", "form_value", "table_data", "list_items"],
+        required:["type", "alignment", "source_content", "translated_content", "form_label", "form_value", "table_data", "list_items"],
         additionalProperties: false
       }
     }
   },
-  required: ["layout_blocks"],
+  required:["layout_blocks"],
   additionalProperties: false
 };
 
@@ -38,9 +38,12 @@ export default defineEventHandler(async (event) => {
   await db.query(`UPDATE pages SET job_status = 'processing' WHERE id = ?`, [id]);
 
   try {
+    // Upgraded to gpt-5.4 with moderate reasoning allocation
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
+      model: "gpt-5.4",
+      reasoning_effort: "medium",
+      max_completion_tokens: 15000,
+      messages:[
         { 
           role: "system", 
           content: "You are a layout packager. Take the provided manually edited translation text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content, just break it into structural blocks (paragraphs, lists, headings) based on line breaks and context." 
@@ -66,7 +69,7 @@ export default defineEventHandler(async (event) => {
       UPDATE pages 
       SET job_status = 'completed', extracted_json = ?, is_stale = FALSE
       WHERE id = ?
-    `, [finalJsonStr, id]);
+    `,[finalJsonStr, id]);
 
     return { success: true, json: currentData };
   } catch (error: any) {

@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
     const values: any[] = [];
 
     if (body.label !== undefined) { updates.push('label = ?'); values.push(body.label); }
+    if (body.notes !== undefined) { updates.push('notes = ?'); values.push(body.notes); }
+    if (body.status !== undefined) { updates.push('status = ?'); values.push(body.status); }
     if (body.rotation !== undefined) { updates.push('rotation = ?'); values.push(body.rotation); }
     if (body.is_excluded !== undefined) { updates.push('is_excluded = ?'); values.push(body.is_excluded); }
     if (body.extracted_json !== undefined) { updates.push('extracted_json = ?'); values.push(body.extracted_json); }

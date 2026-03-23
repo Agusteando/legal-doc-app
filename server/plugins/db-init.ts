@@ -31,8 +31,9 @@ export default defineNitroPlugin(async () => {
         sort_order INT NOT NULL,
         image_url TEXT NOT NULL,
         thumbnail_url TEXT,
-        status VARCHAR(50) DEFAULT 'pending',
+        status VARCHAR(50) DEFAULT 'pending_review',
         label VARCHAR(100),
+        notes TEXT,
         rotation INT DEFAULT 0,
         is_excluded BOOLEAN DEFAULT FALSE,
         is_deleted BOOLEAN DEFAULT FALSE,
@@ -47,9 +48,12 @@ export default defineNitroPlugin(async () => {
       )
     `);
 
-    // Migrations for manual overrides and replacement provenance
+    // Safe schema migrations for live environments
     try { await db.query(`ALTER TABLE pages ADD COLUMN is_manual_translation BOOLEAN DEFAULT FALSE`); } catch (e) {}
     try { await db.query(`ALTER TABLE pages ADD COLUMN is_stale BOOLEAN DEFAULT FALSE`); } catch (e) {}
+    try { await db.query(`ALTER TABLE pages ADD COLUMN notes TEXT`); } catch (e) {}
+    try { await db.query(`ALTER TABLE pages MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending_review'`); } catch (e) {}
+    try { await db.query(`UPDATE pages SET status = 'pending_review' WHERE status = 'pending'`); } catch (e) {}
 
     console.log("Database tables initialized successfully.");
   } catch (error: any) {
