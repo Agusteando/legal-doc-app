@@ -15,6 +15,10 @@
         <button @click="isFilesModalOpen = true" class="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors flex items-center">
           Source Files
         </button>
+        
+        <button @click="createNewWorkspace" class="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors flex items-center">
+          New Workspace
+        </button>
       </div>
 
       <div class="flex items-center space-x-6">
@@ -41,7 +45,7 @@
       <PageStrip class="w-[300px] border-r border-slate-800 bg-slate-900 flex-shrink-0" />
       <DetailView class="flex-1 min-w-0" />
       
-      <!-- Overlay when replacing a file -->
+      <!-- Overlay when appending or replacing a file -->
       <div v-if="workspace.isUploading" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-40 flex flex-col items-center justify-center text-white">
         <LoaderIcon class="w-12 h-12 text-blue-500 animate-spin mb-5" />
         <h3 class="text-lg font-medium tracking-wide">{{ workspace.uploadStatusText }}</h3>
@@ -67,6 +71,12 @@ import SourceFilesModal from './SourceFilesModal.vue';
 const workspace = useWorkspaceStore();
 const isExporting = ref(false);
 const isFilesModalOpen = ref(false);
+
+const createNewWorkspace = () => {
+  if(confirm('Are you sure you want to close this workspace and start a new one? You can still access this workspace later if you have its ID.')) {
+    workspace.clearWorkspace();
+  }
+};
 
 const exportPdf = async () => {
   if (!workspace.document) return;

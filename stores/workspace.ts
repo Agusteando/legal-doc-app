@@ -8,8 +8,16 @@ if (typeof window !== 'undefined') {
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     let reviewer = '';
-    if (typeof window !== 'undefined') reviewer = localStorage.getItem('reviewerPref') || '';
+    let activeDocId = null;
+    
+    // Safely grab persisted settings/session from the browser
+    if (typeof window !== 'undefined') {
+      reviewer = localStorage.getItem('reviewerPref') || '';
+      activeDocId = localStorage.getItem('activeWorkspaceId') || null;
+    }
+    
     return {
+      activeDocId: activeDocId as string | null,
       document: null as any,
       pages: [] as any[],
       selectedPageIds: new Set<string>(),
@@ -18,6 +26,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       uploadStatusText: '',
       uploadProgress: 0,
       reviewerPref: reviewer,
+      isLoadingWorkspace: !!activeDocId, // Show loading only if we are retrieving an active session
     };
   },
   getters: {
@@ -31,14 +40,38 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.reviewerPref = name;
       if (typeof window !== 'undefined') localStorage.setItem('reviewerPref', name);
     },
+    clearWorkspace() {
+      this.activeDocId = null;
+      this.document = null;
+      this.pages = [];
+      this.selectedPageIds.clear();
+      this.lastSelectedId = null;
+      if (typeof window !== 'undefined') localStorage.removeItem('activeWorkspaceId');
+    },
     async fetchWorkspace() {
-      const { data } = await useFetch('/api/workspace/current');
-      if (data.value?.document) {
-        this.document = data.value.document;
-        this.pages = data.value.pages;
-        if (this.pages.length && !this.lastSelectedId) {
-          this.selectPage(this.orderedPages[0]?.id, false, false);
+      if (!this.activeDocId) {
+        this.isLoadingWorkspace = false;
+        return;
+      }
+      
+      this.isLoadingWorkspace = true;
+      try {
+        const data: any = await $fetch(`/api/workspace/${this.activeDocId}`);
+        if (data && data.document) {
+          this.document = data.document;
+          this.pages = data.pages || [];
+          if (this.pages.length && !this.lastSelectedId) {
+            this.selectPage(this.orderedPages[0]?.id, false, false);
+          }
+        } else {
+          // Fallback if document gets deleted from DB
+          this.clearWorkspace();
         }
+      } catch (err) {
+        console.error('Fetch Workspace Error:', err);
+        this.clearWorkspace();
+      } finally {
+        this.isLoadingWorkspace = false;
       }
     },
     async addFiles(files: File[]) {
@@ -50,7 +83,11 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (!this.document) {
           this.uploadStatusText = 'Initializing Workspace...';
           const { id } = await $fetch('/api/workspace/init', { method: 'POST', body: { filename: 'Assembled Workspace' } });
-          await this.fetchWorkspace();
+          
+          // Persist and jump straight into workspace via fetchWorkspace
+          this.activeDocId = id;
+          if (typeof window !== 'undefined') localStorage.setItem('activeWorkspaceId', id);
+          await this.fetchWorkspace(); 
         }
 
         let totalPagesProcessed = 0;
