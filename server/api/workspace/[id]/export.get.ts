@@ -2,7 +2,7 @@ import { getDb } from '../../../utils/db';
 import { uploadToCasita } from '../../../utils/casita';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
-import { renderLayoutBlock } from '../../../utils/renderer';
+import { renderLayoutBlock } from '../../../../utils/renderer';
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
