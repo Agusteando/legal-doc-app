@@ -1,5 +1,6 @@
 import { getDb } from '../../../utils/db';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 // Pure renderer function isolated for Nitro backend
 function renderLayoutBlock(block: any): string {
@@ -10,9 +11,20 @@ function renderLayoutBlock(block: any): string {
     case 'heading': html = `<h2 style="font-size: 1.35rem; font-weight: 700; margin-top: 1.75rem; margin-bottom: 0.75rem; color: #111827; ${align}">${content}</h2>`; break;
     case 'paragraph': html = `<p style="margin-bottom: 1.125rem; line-height: 1.7; color: #374151; ${align}">${content}</p>`; break;
     case 'signature': html = `<div style="margin: 2.5rem 0 1rem 0; padding-top: 0.5rem; border-top: 1px solid #000; width: 250px; ${align}"><span style="font-size: 0.875rem; font-style: italic; color: #6b7280;">${content || 'Signature'}</span></div>`; break;
-    case 'stamp': html = `<div style="margin: 1.5rem 0; padding: 1rem 1.5rem; border: 3px solid #991b1b; color: #991b1b; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; display: inline-block; border-radius: 4px; transform: rotate(-3deg); ${align}">${content || 'STAMP'}</div>`; break;
+    case 'stamp': html = `<div style="margin: 1.5rem 0; padding: 1.5rem; border: 2px dashed #4b5563; color: #4b5563; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; border-radius: 50%; max-width: 250px; text-align: center; font-size: 0.8rem; transform: rotate(-5deg); ${align}">${content || 'STAMP / SEAL'}</div>`; break;
+    case 'handwritten_note': html = `<div style="margin: 1rem 0; padding: 0.75rem; color: #1e3a8a; font-family: 'Caveat', cursive; font-size: 1.25rem; line-height: 1.2; transform: rotate(-2deg); background-color: rgba(59, 130, 246, 0.05); border-left: 2px solid #3b82f6; width: fit-content; max-width: 90%; ${align}">${content}</div>`; break;
     case 'divider': html = `<hr style="margin: 2rem 0; border: none; border-top: 1px solid #d1d5db;" />`; break;
     case 'form_field': html = `<div style="margin-bottom: 1rem; display: flex; align-items: baseline; font-size: 0.95rem; color: #374151;"><span style="font-weight: 600; margin-right: 0.75rem; min-width: 140px; color: #111827;">${block.form_label || ''}:</span><span style="flex-grow: 1; border-bottom: 1px solid #6b7280; padding-bottom: 2px;">${block.form_value || ''}</span></div>`; break;
+    case 'list':
+      const listStyle = block.alignment === 'center' ? 'list-style-position: inside;' : '';
+      html += `<ul style="margin: 1rem 0; padding-left: 2rem; color: #374151; line-height: 1.7; ${align} ${listStyle}">`;
+      if (block.list_items && Array.isArray(block.list_items)) {
+        block.list_items.forEach((item: string) => {
+          html += `<li style="margin-bottom: 0.5rem;">${item}</li>`;
+        });
+      }
+      html += `</ul>`;
+      break;
     case 'table':
       if (block.table_data && Array.isArray(block.table_data)) {
         html += `<table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.9rem; color: #374151;"><tbody>`;
@@ -73,7 +85,8 @@ export default defineEventHandler(async (event) => {
       <head>
         <meta charset="UTF-8">
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+          /* Loading Merriweather for document body, and Caveat for handwritten notes */
+          @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Caveat:wght@500;700&display=swap');
           body {
             font-family: 'Merriweather', serif;
             color: #111827;
@@ -90,12 +103,30 @@ export default defineEventHandler(async (event) => {
   `;
 
   try {
+    // Vercel serverless requires a compressed headless Chromium to run
+    let executablePath = await chromium.executablePath();
+    
+    // Fallback if running locally via `npm run dev` and sparticuz hasn't cached a binary
+    const isLocal = process.env.NODE_ENV === 'development';
+    if (!executablePath && isLocal) {
+      executablePath = process.platform === 'win32' 
+        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
+        : process.platform === 'darwin' 
+          ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          : '/usr/bin/google-chrome';
+    }
+
     const browser = await puppeteer.launch({ 
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: executablePath,
+      headless: chromium.headless,
     });
+    
     const page = await browser.newPage();
-    await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+    
+    // Changed to 'load' to prevent timeouts due to Google Fonts in Vercel
+    await page.setContent(fullHtml, { waitUntil: 'load' });
     
     const pdfBuffer = await page.pdf({ 
       format: 'A4', 
@@ -111,6 +142,6 @@ export default defineEventHandler(async (event) => {
     return pdfBuffer;
   } catch (err: any) {
     console.error("Puppeteer Export Error:", err);
-    throw createError({ statusCode: 500, statusMessage: 'Failed to generate PDF export.' });
+    throw createError({ statusCode: 500, statusMessage: 'Failed to generate PDF export: ' + err.message });
   }
 });

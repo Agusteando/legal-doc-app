@@ -16,7 +16,7 @@ const schema = {
         properties: {
           type: { 
             type: "string", 
-            enum: ["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field"] 
+            enum: ["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field", "handwritten_note", "list"] 
           },
           alignment: { 
             type: "string", 
@@ -29,7 +29,7 @@ const schema = {
           },
           translated_content: { 
             type: "string", 
-            description: "Translated content. Use <b> for bold, <i> for italic, and <u> for underline tags inline where applicable. Empty string if not applicable." 
+            description: "Translated content. Use <b>, <i>, and <u> tags. If text size changes drastically, use <big> or <small> tags. Empty string if not applicable." 
           },
           form_label: { 
             type: "string", 
@@ -46,6 +46,11 @@ const schema = {
               type: "array", 
               items: { type: "string" } 
             }
+          },
+          list_items: {
+            type: "array",
+            description: "Array of list item strings. Return an empty array [] if type is not a list.",
+            items: { type: "string" }
           }
         },
         // In OpenAI strict mode, EVERY property must be explicitly marked as required.
@@ -57,7 +62,8 @@ const schema = {
           "translated_content", 
           "form_label", 
           "form_value", 
-          "table_data"
+          "table_data",
+          "list_items"
         ],
         additionalProperties: false
       }
@@ -82,8 +88,7 @@ export default defineEventHandler(async (event) => {
   try {
     const imageUrl = pages[0].image_url;
 
-    // We fetch the image from the URL server-to-server and convert it to Base64.
-    // This entirely bypasses OpenAI's bot crawler, preventing the "Timeout while downloading" error.
+    // Fetch the image from the URL server-to-server and convert it to Base64 to bypass URL crawler blocks.
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
       throw new Error(`Our server failed to fetch the image from storage: ${imageResponse.statusText}`);
@@ -99,12 +104,12 @@ export default defineEventHandler(async (event) => {
       messages: [
         { 
           role: "system", 
-          content: "Extract and translate the legal document page into structured JSON layout blocks. Strictly respect formatting (bold=<b>, italic=<i>, underline=<u>) within translated_content. Identify dividers, alignments, and form field rows carefully." 
+          content: "Extract and translate the legal document page into structured JSON layout blocks. You are an expert at parsing complex Latin American legal layouts (e.g., Juicio Ordinario Civil, right-aligned vs blocks, marginalia). Break the document down granularly. Isolate stamps/seals, handwritten annotations, and distinct paragraphs into their own blocks. Strictly respect formatting (bold=<b>, italic=<i>, underline=<u>). If the font size changes drastically within the page, wrap the scaled text in <big> or <small> tags within translated_content. Identify dividers, precise alignments (left/right/center/justify), and form field rows carefully." 
         },
         {
           role: "user",
           content: [
-            { type: "text", text: "Process this legal document page image into structured JSON." },
+            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks." },
             { type: "image_url", image_url: { url: base64ImageUrl } }
           ]
         }
