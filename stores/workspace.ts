@@ -10,7 +10,6 @@ export const useWorkspaceStore = defineStore('workspace', {
     let reviewer = '';
     let activeDocId = null;
     
-    // Safely grab persisted settings/session from the browser
     if (typeof window !== 'undefined') {
       reviewer = localStorage.getItem('reviewerPref') || '';
       activeDocId = localStorage.getItem('activeWorkspaceId') || null;
@@ -26,7 +25,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       uploadStatusText: '',
       uploadProgress: 0,
       reviewerPref: reviewer,
-      isLoadingWorkspace: !!activeDocId, // Show loading only if we are retrieving an active session
+      isLoadingWorkspace: !!activeDocId, 
     };
   },
   getters: {
@@ -63,13 +62,14 @@ export const useWorkspaceStore = defineStore('workspace', {
           if (this.pages.length && !this.lastSelectedId) {
             this.selectPage(this.orderedPages[0]?.id, false, false);
           }
-        } else {
-          // Fallback if document gets deleted from DB
+        }
+      } catch (err: any) {
+        console.error('Fetch Workspace Error:', err);
+        // Only wipe the workspace if the server explicitly confirms it no longer exists
+        if (err.statusCode === 404 || err.response?.status === 404) {
+          console.warn("Workspace not found, returning to uploader.");
           this.clearWorkspace();
         }
-      } catch (err) {
-        console.error('Fetch Workspace Error:', err);
-        this.clearWorkspace();
       } finally {
         this.isLoadingWorkspace = false;
       }
@@ -78,16 +78,23 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (!files.length) return;
       this.isUploading = true;
       this.uploadProgress = 0;
+      this.uploadStatusText = 'Initializing...';
+      
+      let uploadErrors: string[] = [];
       
       try {
         if (!this.document) {
-          this.uploadStatusText = 'Initializing Workspace...';
-          const { id } = await $fetch('/api/workspace/init', { method: 'POST', body: { filename: 'Assembled Workspace' } });
+          this.uploadStatusText = 'Creating Workspace...';
+          const res: any = await $fetch('/api/workspace/init', { method: 'POST', body: { filename: 'Assembled Workspace' } });
           
-          // Persist and jump straight into workspace via fetchWorkspace
-          this.activeDocId = id;
-          if (typeof window !== 'undefined') localStorage.setItem('activeWorkspaceId', id);
-          await this.fetchWorkspace(); 
+          if (!res || !res.id) throw new Error("Failed to get a valid Workspace ID from the server.");
+
+          this.activeDocId = res.id;
+          if (typeof window !== 'undefined') localStorage.setItem('activeWorkspaceId', res.id);
+          
+          // Optimistic UI adoption: Locks us into the workspace immediately so fetchWorkspace doesn't race condition us out.
+          this.document = { id: res.id, filename: 'Assembled Workspace', status: 'open' };
+          this.pages = [];
         }
 
         let totalPagesProcessed = 0;
@@ -96,27 +103,35 @@ export const useWorkspaceStore = defineStore('workspace', {
 
         this.uploadStatusText = 'Reading PDFs...';
         for (const file of files) {
-          const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          totalPagesExpected += pdf.numPages;
-          pdfDocs.push({ pdf, file, pages: pdf.numPages });
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            totalPagesExpected += pdf.numPages;
+            pdfDocs.push({ pdf, file, pages: pdf.numPages });
+          } catch (pdfErr: any) {
+             uploadErrors.push(`Failed to read ${file.name}: ${pdfErr.message}`);
+          }
         }
 
         for (const docObj of pdfDocs) {
           for (let i = 1; i <= docObj.pages; i++) {
             this.uploadStatusText = `Extracting: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
-            await new Promise(r => setTimeout(r, 20));
+            await new Promise(r => setTimeout(r, 20)); // UI breather
+            
             try {
               const page = await docObj.pdf.getPage(i);
               const viewport = page.getViewport({ scale: 2.0 }); 
               const canvas = document.createElement('canvas');
               const ctx = canvas.getContext('2d');
+              
+              if (!ctx) throw new Error("Could not construct local canvas context.");
+              
               canvas.width = viewport.width;
               canvas.height = viewport.height;
               
               await page.render({ canvasContext: ctx, viewport }).promise;
               const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-              if (!blob) continue;
+              if (!blob) throw new Error("Failed to extract image binary.");
 
               const formData = new FormData();
               formData.append('document_id', this.document.id);
@@ -125,15 +140,30 @@ export const useWorkspaceStore = defineStore('workspace', {
               formData.append('file', blob);
 
               await $fetch('/api/pages/upload', { method: 'POST', body: formData });
-            } catch (err: any) { console.error(`Page error:`, err); }
-            totalPagesProcessed++;
-            this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
+              
+              totalPagesProcessed++;
+              this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
+            } catch (err: any) { 
+              console.error(`Page ${i} extraction error:`, err); 
+              uploadErrors.push(`Page ${i} error: ${err.message || 'Unknown Network Error'}`);
+            }
           }
         }
-        this.uploadStatusText = 'Finalizing...';
+        
+        this.uploadStatusText = 'Finalizing Workspace...';
         await this.fetchWorkspace();
-      } catch (err: any) { alert('Upload Error: ' + err.message); } 
-      finally { this.isUploading = false; this.uploadStatusText = ''; this.uploadProgress = 0; }
+        
+        if (uploadErrors.length > 0) {
+          alert(`Upload completed with ${uploadErrors.length} errors.\n\nFirst issue: ${uploadErrors[0]}`);
+        }
+      } catch (err: any) { 
+        console.error("Critical Upload Error:", err);
+        alert('Upload Sequence Failed: ' + (err.message || 'Server error')); 
+      } finally { 
+        this.isUploading = false; 
+        this.uploadStatusText = ''; 
+        this.uploadProgress = 0; 
+      }
     },
     async replaceSourceFile(oldFilename: string, newFile: File) {
       if (!this.document) return;

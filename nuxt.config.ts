@@ -15,10 +15,11 @@ export default defineNuxtConfig({
     }
   },
   routeRules: {
-    // Extends Vercel timeout for PDF generation and API calls
+    // Extends Vercel timeout for heavy background processes
     '/api/pages/**/process': { maxDuration: 60 },
     '/api/pages/**/sync-layout': { maxDuration: 60 },
-    '/api/documents/**/export': { maxDuration: 60 }
+    '/api/documents/**/export': { maxDuration: 60 },
+    '/api/pages/upload': { maxDuration: 60 }
   },
   runtimeConfig: {
     openaiApiKey: process.env.OPENAI_API_KEY,
@@ -29,7 +30,6 @@ export default defineNuxtConfig({
     dbName: process.env.DB_NAME,
     storageUploadUrl: process.env.STORAGE_UPLOAD_URL || 'https://expediente.casitaapps.com/upload.ashx',
     
-    // Configured to point directly to your new PM2 Ubuntu rendering service
     renderServiceUrl: process.env.RENDER_SERVICE_URL || 'https://puppeteer.casitaapps.com',
     renderServiceToken: process.env.RENDER_SERVICE_TOKEN || 'super_secret_render_token_123',
   },
