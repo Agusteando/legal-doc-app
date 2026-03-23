@@ -19,7 +19,10 @@ export default defineEventHandler(async (event) => {
     // Fallback if they bypassed the WYSIWYG editor
     if (!innerHtml) {
       const [pages]: any = await db.query(`SELECT extracted_json FROM pages WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE ORDER BY sort_order ASC`, [id]);
-      const { renderLayoutBlock } = await import('../../../utils/renderer');
+      
+      // FIX: 4 levels up to reach the root /utils folder
+      const { renderLayoutBlock } = await import('../../../../utils/renderer');
+      
       innerHtml = '';
       for (const page of pages) {
         if (page.extracted_json) {
