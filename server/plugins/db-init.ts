@@ -47,7 +47,7 @@ export default defineNitroPlugin(async () => {
       )
     `);
 
-    // Migrations for new features (ignores errors if columns already exist)
+    // Migrations for manual overrides and replacement provenance
     try { await db.query(`ALTER TABLE pages ADD COLUMN is_manual_translation BOOLEAN DEFAULT FALSE`); } catch (e) {}
     try { await db.query(`ALTER TABLE pages ADD COLUMN is_stale BOOLEAN DEFAULT FALSE`); } catch (e) {}
 

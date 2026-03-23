@@ -59,7 +59,7 @@ const exportPdf = async () => {
   if (!workspace.document) return;
   isExporting.value = true;
   try {
-    // Fixed logic for Vercel: We hit the endpoint, it uploads PDF to storage and returns URL
+    // Vercel limits bypassed: endpoint now uploads PDF to storage and returns a secure public URL.
     const res = await $fetch(`/api/workspace/${workspace.document.id}/export`);
     if (res.url) {
       window.open(res.url, '_blank');
@@ -67,7 +67,7 @@ const exportPdf = async () => {
       throw new Error("No URL returned from export engine.");
     }
   } catch (err) {
-    alert("Export Error: " + err.message);
+    alert("Export Error: " + (err.data?.statusMessage || err.message));
   } finally {
     isExporting.value = false;
   }

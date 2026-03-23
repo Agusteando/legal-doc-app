@@ -33,8 +33,8 @@
         <div class="mt-2.5 flex flex-col px-1 relative">
           <!-- Status Indicators -->
           <div class="absolute -top-3.5 right-0 flex space-x-1">
-             <div v-if="page.is_stale" class="w-2.5 h-2.5 bg-yellow-500 rounded-full shadow" title="Stale content from file replacement"></div>
-             <div v-if="page.is_manual_translation" class="w-2.5 h-2.5 bg-purple-500 rounded-full shadow" title="Contains Manual Overrides"></div>
+             <div v-if="page.is_stale" class="w-2.5 h-2.5 bg-yellow-500 rounded-full shadow border border-slate-900" title="Stale content from file replacement"></div>
+             <div v-if="page.is_manual_translation" class="w-2.5 h-2.5 bg-purple-500 rounded-full shadow border border-slate-900" title="Contains Manual Overrides"></div>
           </div>
           
           <div class="flex justify-between items-center mb-1">

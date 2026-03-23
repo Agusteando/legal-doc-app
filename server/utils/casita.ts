@@ -16,7 +16,7 @@ export async function uploadToCasita(buffer: Buffer, filename: string, mimetype:
   });
 
   if (!response.ok) {
-    throw new Error(`Upload to Casita failed with status: ${response.status}`);
+    throw new Error(`Upload to Casita failed with status: ${response.status} - ${response.statusText}`);
   }
 
   const text = await response.text();

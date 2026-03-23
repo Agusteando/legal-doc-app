@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
       await db.query(`UPDATE pages SET sort_order = ? WHERE id = ?`, [u.sort_order, u.id]);
     }
   } else {
-    // Single update with dynamic fields mapping
+    // Single page field updates
     const updates: string[] = [];
     const values: any[] = [];
 

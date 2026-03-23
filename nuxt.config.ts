@@ -7,12 +7,18 @@ export default defineNuxtConfig({
       link: [
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
-        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap' }
+        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Caveat:wght@500;700&display=swap' }
       ],
       script: [
         { src: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js' }
       ]
     }
+  },
+  routeRules: {
+    // Extends Vercel timeout for PDF generation and API calls
+    '/api/workspace/**/export': { maxDuration: 60 },
+    '/api/pages/**/process': { maxDuration: 60 },
+    '/api/pages/**/sync-layout': { maxDuration: 60 }
   },
   runtimeConfig: {
     openaiApiKey: process.env.OPENAI_API_KEY,

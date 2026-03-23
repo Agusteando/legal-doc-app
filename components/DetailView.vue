@@ -6,8 +6,8 @@
         <span class="text-xs text-slate-400 bg-slate-900 px-2.5 py-1 rounded truncate max-w-[200px] border border-slate-700/50" :title="page.source_filename">
           {{ page.source_filename }}
         </span>
-        <div v-if="page.is_stale" class="bg-yellow-900/30 border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded text-xs font-bold uppercase">Stale / Unprocessed</div>
-        <div v-if="page.is_manual_translation" class="bg-purple-900/30 border border-purple-500/30 text-purple-400 px-2 py-0.5 rounded text-xs font-bold uppercase">Manual Edit</div>
+        <div v-if="page.is_stale" class="bg-yellow-900/30 border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Stale / Replaced</div>
+        <div v-if="page.is_manual_translation" class="bg-purple-900/30 border border-purple-500/30 text-purple-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Manual Edit</div>
       </div>
       <div class="flex space-x-1">
         <button @click="toggleExclude" class="p-2 rounded-md transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/30 hover:bg-red-900/50' : 'text-slate-400 hover:bg-slate-700 hover:text-white'" title="Toggle Exclude">
@@ -24,12 +24,10 @@
     </div>
 
     <div class="flex-1 flex min-h-0 relative">
-      <!-- Left: Image Viewer -->
       <div class="w-1/2 border-r border-slate-700 bg-slate-950 p-6 overflow-auto flex items-center justify-center">
         <img :src="page.image_url" class="max-w-full shadow-2xl transition-transform rounded-sm border border-slate-800" :style="{ transform: `rotate(${page.rotation}deg)` }" />
       </div>
       
-      <!-- Right: Editor Pane -->
       <div class="w-1/2 flex flex-col bg-slate-900 relative">
         <div class="flex border-b border-slate-700 bg-slate-800">
           <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
@@ -41,40 +39,36 @@
         
         <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 p-6 relative">
           
-          <!-- Source Text Editor -->
           <div v-if="activeTab === 'source'" class="h-full flex flex-col">
             <div class="mb-3 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Edit OCR source directly.</span>
-              <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.source ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Source</button>
+              <span class="text-xs text-slate-400 font-medium">Edit raw source extraction.</span>
+              <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.source ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Changes</button>
             </div>
             <textarea v-model="localSource" class="w-full flex-1 bg-slate-950 text-slate-300 font-mono text-sm p-4 rounded-md border border-slate-700 focus:outline-none focus:border-blue-500 resize-none shadow-inner"></textarea>
           </div>
 
-          <!-- Translation Editor -->
           <div v-else-if="activeTab === 'translated'" class="h-full flex flex-col">
             <div class="mb-3 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Edit manual translation. To update layout engine, click Sync after saving.</span>
+              <span class="text-xs text-slate-400 font-medium">Edit translation. To update layout engine, click Sync after saving.</span>
               <div class="flex space-x-2">
-                <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.translated ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Edit</button>
-                <button @click="syncLayout" :disabled="dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 flex items-center" title="Rebuild HTML Layout blocks from this text">
-                  <RefreshCwIcon class="w-3 h-3 mr-1" :class="{'animate-spin': isSyncing}" /> Sync Layout
+                <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.translated ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Text</button>
+                <button @click="syncLayout" :disabled="dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 flex items-center shadow-sm" title="Rebuild HTML Layout blocks from this text">
+                  <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" :class="{'animate-spin': isSyncing}" /> Sync Layout
                 </button>
               </div>
             </div>
             <textarea v-model="localTranslation" class="w-full flex-1 bg-slate-950 text-slate-200 text-[15px] leading-relaxed p-4 rounded-md border border-slate-700 focus:outline-none focus:border-blue-500 resize-none shadow-inner"></textarea>
           </div>
           
-          <!-- JSON Editor -->
           <div v-else-if="activeTab === 'json'" class="h-full flex flex-col">
             <div class="mb-3 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Edit canonical data blocks directly.</span>
-              <button @click="saveJson" :disabled="!dirtyFlags.json" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.json ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'">Save JSON</button>
+              <span class="text-xs text-slate-400 font-medium">Edit deterministic layout blocks directly.</span>
+              <button @click="saveJson" :disabled="!dirtyFlags.json" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors shadow-sm" :class="dirtyFlags.json ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'">Save JSON</button>
             </div>
             <textarea v-model="localJson" class="w-full flex-1 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-md border border-slate-700 focus:outline-none focus:border-emerald-500 resize-none shadow-inner"></textarea>
           </div>
           
-          <!-- Document Render -->
-          <div v-else-if="activeTab === 'html'" class="h-full overflow-y-auto w-full flex justify-center">
+          <div v-else-if="activeTab === 'html'" class="h-full overflow-y-auto w-full flex justify-center pb-8">
             <div class="max-w-[21cm] w-full bg-white text-black p-12 shadow-2xl rounded-sm min-h-[29.7cm]" style="font-family: 'Merriweather', serif;">
               <div v-html="renderedHtml"></div>
             </div>
@@ -114,11 +108,7 @@ const localTranslation = ref('');
 const localJson = ref('');
 const isSyncing = ref(false);
 
-const dirtyFlags = reactive({
-  source: false,
-  translated: false,
-  json: false
-});
+const dirtyFlags = reactive({ source: false, translated: false, json: false });
 
 watch(() => page.value, (p) => {
   if (p) {
@@ -167,7 +157,7 @@ const saveJson = async () => {
 };
 
 const syncLayout = async () => {
-  if (!page.value || dirtyFlags.translated) return alert("Save translation first.");
+  if (!page.value || dirtyFlags.translated) return alert("Please save your translation text first.");
   isSyncing.value = true;
   try {
     const res = await $fetch(`/api/pages/${page.value.id}/sync-layout`, {
@@ -176,8 +166,8 @@ const syncLayout = async () => {
     });
     page.value.extracted_json = JSON.stringify(res.json, null, 2);
     localJson.value = JSON.stringify(res.json, null, 2);
+    page.value.is_stale = false;
     dirtyFlags.json = false;
-    alert("Layout successfully synchronized with manual translation.");
   } catch (err) {
     alert("Sync Error: " + err.message);
   } finally {
@@ -199,7 +189,7 @@ const rotate = async () => {
 
 const deletePage = async () => {
   if (!page.value) return;
-  if (confirm('Permanently remove this page?')) await workspace.deletePage(page.value.id);
+  if (confirm('Permanently remove this page from the workspace?')) await workspace.deletePage(page.value.id);
 };
 
 const renderedHtml = computed(() => {

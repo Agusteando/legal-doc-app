@@ -2,7 +2,6 @@ import { getDb } from '../../../utils/db';
 import { useRuntimeConfig } from '#imports';
 import OpenAI from 'openai';
 
-// Same strict schema structure as processing endpoint
 const schema = {
   type: "object",
   properties: {
@@ -51,10 +50,9 @@ export default defineEventHandler(async (event) => {
       response_format: { type: "json_schema", json_schema: { name: "sync_layout", strict: true, schema } }
     });
 
-    const jsonStr = response.choices[0].message.content || '{}';
-    const parsed = JSON.parse(jsonStr);
+    const parsed = JSON.parse(response.choices[0].message.content || '{}');
     
-    // We update ONLY the layout blocks, preserving the manually edited text
+    // Merge new blocks into existing JSON so we don't destroy confidence_scores
     const [existing]: any = await db.query(`SELECT extracted_json FROM pages WHERE id = ?`, [id]);
     let currentData = { source_text: body.source_text, translated_text: body.translated_text, confidence_score: 1, needs_review: false, layout_blocks: [] };
     if (existing.length && existing[0].extracted_json) {
