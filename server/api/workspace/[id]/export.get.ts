@@ -1,4 +1,4 @@
-import { getDb } from '../../../../utils/db';
+import { getDb } from '../../../utils/db';
 import puppeteer from 'puppeteer';
 
 // Pure renderer function isolated for Nitro backend
