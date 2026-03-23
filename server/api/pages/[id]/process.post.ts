@@ -42,12 +42,26 @@ export default defineEventHandler(async (event) => {
   const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
   const [pages]: any = await db.query(`SELECT image_url FROM pages WHERE id = ?`, [id]);
-  if (!pages.length) throw createError({ statusCode: 404 });
+  if (!pages.length) throw createError({ statusCode: 404, statusMessage: 'Page not found in database.' });
 
   const start = Date.now();
   await db.query(`UPDATE pages SET job_status = 'processing', job_error = NULL WHERE id = ?`, [id]);
 
   try {
+    const imageUrl = pages[0].image_url;
+
+    // We fetch the image from the URL server-to-server and convert it to Base64.
+    // This entirely bypasses OpenAI's bot crawler, preventing the "Timeout while downloading" error.
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Our server failed to fetch the image from storage: ${imageResponse.statusText}`);
+    }
+    
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const base64String = Buffer.from(arrayBuffer).toString('base64');
+    const mimeType = imageResponse.headers.get('content-type') || 'image/png';
+    const base64ImageUrl = `data:${mimeType};base64,${base64String}`;
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -59,7 +73,7 @@ export default defineEventHandler(async (event) => {
           role: "user",
           content: [
             { type: "text", text: "Process this legal document page image into structured JSON." },
-            { type: "image_url", image_url: { url: pages[0].image_url } }
+            { type: "image_url", image_url: { url: base64ImageUrl } }
           ]
         }
       ],
@@ -84,7 +98,10 @@ export default defineEventHandler(async (event) => {
 
   } catch (error: any) {
     const duration = Math.round((Date.now() - start) / 1000);
-    await db.query(`UPDATE pages SET job_status = 'error', job_duration_sec = ?, job_error = ? WHERE id = ?`, [duration, error.message, id]);
-    throw createError({ statusCode: 500, statusMessage: error.message });
+    const errorMessage = error.message || 'An unknown error occurred';
+    
+    await db.query(`UPDATE pages SET job_status = 'error', job_duration_sec = ?, job_error = ? WHERE id = ?`, [duration, errorMessage, id]);
+    
+    throw createError({ statusCode: 500, statusMessage: errorMessage });
   }
 });
