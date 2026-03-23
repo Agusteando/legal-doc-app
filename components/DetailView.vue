@@ -1,119 +1,126 @@
 <template>
-  <div v-if="page" class="h-full flex flex-col bg-slate-900 overflow-hidden">
-    <div class="h-14 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between px-5 shrink-0">
-      <div class="flex items-center space-x-3">
-        <h2 class="font-semibold text-slate-100 text-sm">Page {{ page.sort_order }} Inspector</h2>
-        <span class="text-xs text-slate-400 bg-slate-900 px-2.5 py-1 rounded truncate max-w-[200px] border border-slate-700/50" :title="page.source_filename">
-          {{ page.source_filename }}
-        </span>
-        <div v-if="page.is_stale" class="bg-yellow-900/30 border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Stale / Replaced</div>
-        <div v-if="page.is_manual_translation" class="bg-purple-900/30 border border-purple-500/30 text-purple-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Manual Edit</div>
+  <div v-if="page" class="h-full flex bg-slate-950 overflow-hidden relative">
+    
+    <!-- CENTER: Document Image Viewer (Fluid, max space) -->
+    <div class="flex-1 flex flex-col min-w-0 bg-[#0f1117] relative">
+      <div class="absolute top-4 left-4 z-10 flex space-x-2">
+        <div class="bg-slate-900/80 backdrop-blur border border-slate-700/50 rounded-lg p-1.5 flex space-x-1 shadow-lg">
+          <button @click="toggleExclude" class="p-2 rounded hover:bg-slate-800 transition-colors" :class="page.is_excluded ? 'text-red-400' : 'text-slate-400'" title="Toggle Exclude">
+            <BanIcon class="w-4 h-4" />
+          </button>
+          <button @click="rotate" class="p-2 rounded hover:bg-slate-800 text-slate-400 transition-colors" title="Rotate Image">
+            <RotateCwIcon class="w-4 h-4" />
+          </button>
+          <div class="w-px h-5 bg-slate-700 self-center mx-1"></div>
+          <button @click="deletePage" class="p-2 rounded hover:bg-red-900/40 text-slate-400 hover:text-red-400 transition-colors" title="Delete Page">
+            <TrashIcon class="w-4 h-4" />
+          </button>
+        </div>
       </div>
-      
-      <div class="flex space-x-1 items-center">
-        <button @click="toggleExclude" class="p-1.5 rounded-md transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/30 hover:bg-red-900/50' : 'text-slate-400 hover:bg-slate-700 hover:text-white'" title="Toggle Exclude">
-          <BanIcon class="w-5 h-5" />
-        </button>
-        <button @click="rotate" class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Rotate Image">
-          <RotateCwIcon class="w-5 h-5" />
-        </button>
-        <button @click="deletePage" class="p-1.5 rounded-md text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors" title="Delete Page">
-          <TrashIcon class="w-5 h-5" />
-        </button>
-        <div class="w-px h-6 bg-slate-600 mx-2"></div>
-        <button @click="workspace.prevPage()" class="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-white transition-colors" title="Previous Page">
-          <ChevronLeftIcon class="w-5 h-5" />
-        </button>
-        <button @click="workspace.nextPage()" class="p-1.5 rounded-md hover:bg-slate-700 text-slate-400 hover:text-white transition-colors" title="Next Page">
-          <ChevronRightIcon class="w-5 h-5" />
-        </button>
+
+      <div class="flex-1 overflow-auto p-8 flex items-center justify-center">
+        <div class="relative group">
+          <img :src="page.image_url" class="max-w-full h-auto max-h-[85vh] shadow-2xl rounded border border-slate-800 transition-transform duration-300 ease-out" :style="{ transform: `rotate(${page.rotation}deg)` }" />
+          <div v-if="page.is_excluded" class="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center rounded">
+            <span class="text-sm font-bold tracking-widest bg-red-600 text-white px-4 py-2 rounded shadow-lg">EXCLUDED</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="flex-1 flex min-h-0 relative">
-      <!-- Left: Image Viewer (35%) -->
-      <div class="w-[35%] border-r border-slate-700 bg-slate-950 p-6 overflow-auto flex items-center justify-center">
-        <img :src="page.image_url" class="max-w-full shadow-2xl transition-transform rounded-sm border border-slate-800" :style="{ transform: `rotate(${page.rotation}deg)` }" />
-      </div>
+    <!-- RIGHT: Inspector Panel (450px fixed) -->
+    <div class="w-[450px] shrink-0 border-l border-slate-800 bg-slate-900 flex flex-col shadow-2xl z-10">
       
-      <!-- Center: Extracted Content (Flex-1) -->
-      <div class="flex-1 flex flex-col bg-slate-900 border-r border-slate-700 min-w-0">
-        <div class="flex border-b border-slate-700 bg-slate-800">
-          <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
-            class="px-5 py-3 text-sm font-medium border-b-2 transition-all outline-none"
-            :class="activeTab === tab.id ? 'border-blue-500 text-blue-400 bg-slate-900' : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'">
-            {{ tab.label }} <span v-if="dirtyFlags[tab.id]" class="w-2 h-2 rounded-full bg-blue-500 inline-block ml-1 mb-0.5"></span>
-          </button>
-        </div>
-        
-        <div class="flex-1 flex flex-col overflow-hidden bg-slate-900 p-6 relative">
-          <div v-if="activeTab === 'source'" class="h-full flex flex-col">
-            <div class="mb-3 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Edit raw source extraction.</span>
-              <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors shadow-sm" :class="dirtyFlags.source ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Changes</button>
-            </div>
-            <textarea v-model="localSource" class="w-full flex-1 bg-slate-950 text-slate-300 font-mono text-sm p-4 rounded-md border border-slate-700 focus:outline-none focus:border-blue-500 resize-none shadow-inner"></textarea>
+      <!-- Inspector Header & Meta -->
+      <div class="p-5 border-b border-slate-800 bg-slate-900">
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-center space-x-3">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Page {{ page.sort_order }}</span>
+            <span v-if="page.is_stale" class="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Stale</span>
+            <span v-if="page.is_manual_translation" class="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Edited</span>
           </div>
+          <div class="flex space-x-1">
+            <button @click="workspace.prevPage()" class="p-1.5 rounded hover:bg-slate-800 text-slate-400 transition-colors"><ChevronLeftIcon class="w-4 h-4" /></button>
+            <button @click="workspace.nextPage()" class="p-1.5 rounded hover:bg-slate-800 text-slate-400 transition-colors"><ChevronRightIcon class="w-4 h-4" /></button>
+          </div>
+        </div>
 
-          <div v-else-if="activeTab === 'translated'" class="h-full flex flex-col">
-            <div class="mb-3 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Edit translation. To update layout engine, click Sync after saving.</span>
-              <div class="flex space-x-2">
-                <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors shadow-sm" :class="dirtyFlags.translated ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500'">Save Text</button>
-                <button @click="syncLayout" :disabled="dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 flex items-center shadow-sm" title="Rebuild HTML Layout blocks from this text">
-                  <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" :class="{'animate-spin': isSyncing}" /> Sync Layout
-                </button>
-              </div>
-            </div>
-            <textarea v-model="localTranslation" class="w-full flex-1 bg-slate-950 text-slate-200 text-[15px] leading-relaxed p-4 rounded-md border border-slate-700 focus:outline-none focus:border-blue-500 resize-none shadow-inner"></textarea>
-          </div>
-          
-          <div v-else-if="activeTab === 'json'" class="h-full flex flex-col">
-            <div class="mb-3 flex justify-between items-center">
-              <span class="text-xs text-slate-400 font-medium">Edit deterministic layout blocks directly.</span>
-              <button @click="saveJson" :disabled="!dirtyFlags.json" class="text-xs font-medium px-4 py-1.5 rounded disabled:opacity-50 transition-colors shadow-sm" :class="dirtyFlags.json ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'">Save JSON</button>
-            </div>
-            <textarea v-model="localJson" class="w-full flex-1 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-md border border-slate-700 focus:outline-none focus:border-emerald-500 resize-none shadow-inner"></textarea>
-          </div>
-          
-          <div v-else-if="activeTab === 'html'" class="h-full overflow-y-auto w-full flex justify-center pb-8">
-            <div class="max-w-[21cm] w-full bg-white text-black p-12 shadow-2xl rounded-sm min-h-[29.7cm] border border-slate-200" style="font-family: 'Merriweather', serif;">
-              <div v-html="renderedHtml"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right: Inspector/Metadata (280px) -->
-      <div class="w-[280px] shrink-0 bg-slate-800 flex flex-col overflow-y-auto">
-        <div class="p-4 border-b border-slate-700 bg-slate-800/80 sticky top-0 z-10 shadow-sm">
-          <h3 class="font-semibold text-slate-100 text-sm">Page Metadata</h3>
-        </div>
-        <div class="p-5 space-y-6">
+        <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Review Status</label>
-            <select v-model="localStatus" @change="saveMetadata" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-inner font-medium" :class="{'text-emerald-400': localStatus === 'approved', 'text-red-400': localStatus === 'needs_work', 'text-amber-400': localStatus === 'pending_review'}">
+            <label class="block text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Status</label>
+            <select v-model="localStatus" @change="saveMetadata" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all font-medium appearance-none" :class="{'text-emerald-400': localStatus === 'approved', 'text-red-400': localStatus === 'needs_work', 'text-amber-400': localStatus === 'pending_review'}">
               <option value="pending_review" class="text-amber-400">Pending Review</option>
               <option value="approved" class="text-emerald-400">Approved</option>
               <option value="needs_work" class="text-red-400">Needs Work</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Page Label</label>
-            <input v-model="localLabel" @blur="saveMetadata" placeholder="e.g. Exhibit A" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-inner placeholder-slate-600" />
-          </div>
-          <div class="flex-1">
-            <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Internal Notes</label>
-            <textarea v-model="localNotes" @blur="saveMetadata" placeholder="Add review notes or translator comments here..." class="w-full h-40 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none shadow-inner leading-relaxed placeholder-slate-600"></textarea>
+            <label class="block text-[10px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Label</label>
+            <input v-model="localLabel" @blur="saveMetadata" placeholder="e.g. Exhibit A" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all placeholder-slate-700" />
           </div>
         </div>
       </div>
+
+      <!-- Editor Tabs -->
+      <div class="flex px-2 pt-2 border-b border-slate-800 bg-slate-900/50">
+        <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
+          class="px-4 py-2.5 text-xs font-medium border-b-2 transition-all outline-none relative"
+          :class="activeTab === tab.id ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'">
+          {{ tab.label }}
+          <span v-if="dirtyFlags[tab.id]" class="absolute top-2 right-1 w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+        </button>
+      </div>
+      
+      <!-- Editor Content Area -->
+      <div class="flex-1 flex flex-col min-h-0 bg-slate-950 relative">
+        <div v-if="activeTab === 'source'" class="h-full flex flex-col p-4">
+          <div class="mb-3 flex justify-between items-center">
+            <span class="text-xs text-slate-500">Raw source OCR.</span>
+            <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.source ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'">Save</button>
+          </div>
+          <textarea v-model="localSource" class="w-full flex-1 bg-transparent text-slate-300 font-mono text-[13px] leading-relaxed p-0 border-none focus:ring-0 resize-none outline-none"></textarea>
+        </div>
+
+        <div v-else-if="activeTab === 'translated'" class="h-full flex flex-col p-4">
+          <div class="mb-3 flex justify-between items-center">
+            <span class="text-xs text-slate-500">Edit translation text.</span>
+            <div class="flex space-x-2">
+              <button @click="syncLayout" :disabled="dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50 flex items-center transition-colors" title="Sync layout blocks">
+                <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" :class="{'animate-spin': isSyncing}" /> Sync
+              </button>
+              <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.translated ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'">Save</button>
+            </div>
+          </div>
+          <textarea v-model="localTranslation" class="w-full flex-1 bg-transparent text-slate-200 text-[14px] leading-relaxed p-0 border-none focus:ring-0 resize-none outline-none"></textarea>
+        </div>
+        
+        <div v-else-if="activeTab === 'json'" class="h-full flex flex-col p-4">
+          <div class="mb-3 flex justify-between items-center">
+            <span class="text-xs text-slate-500">Edit strict layout blocks.</span>
+            <button @click="saveJson" :disabled="!dirtyFlags.json" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.json ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'">Save JSON</button>
+          </div>
+          <textarea v-model="localJson" class="w-full flex-1 bg-transparent text-emerald-400 font-mono text-[12px] leading-relaxed p-0 border-none focus:ring-0 resize-none outline-none"></textarea>
+        </div>
+        
+        <div v-else-if="activeTab === 'html'" class="h-full overflow-y-auto w-full bg-slate-200">
+          <div class="w-full bg-white text-black p-8 min-h-full" style="font-family: 'Merriweather', serif; font-size: 10pt;">
+            <div v-html="renderedHtml"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes Panel (Bottom Fixed) -->
+      <div class="p-4 border-t border-slate-800 bg-slate-900 shrink-0 h-36 flex flex-col">
+        <label class="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wide">Internal Notes</label>
+        <textarea v-model="localNotes" @blur="saveMetadata" placeholder="Add review notes, translator comments, or tags..." class="w-full flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none placeholder-slate-700"></textarea>
+      </div>
+
     </div>
   </div>
-  <div v-else class="h-full flex items-center justify-center text-slate-500 flex-col bg-slate-900">
-    <div class="bg-slate-800 p-6 rounded-full mb-6"><FileTextIcon class="w-12 h-12 text-slate-400" /></div>
-    <p class="text-lg font-medium text-slate-300">No page selected</p>
-    <p class="text-sm mt-2 text-slate-500">Select a page from the document strip to inspect and edit.</p>
+  
+  <div v-else class="h-full flex items-center justify-center text-slate-500 flex-col bg-[#0f1117]">
+    <div class="bg-slate-900/50 p-8 rounded-full mb-6 border border-slate-800/50"><FileTextIcon class="w-12 h-12 text-slate-600" /></div>
+    <p class="text-[15px] font-medium text-slate-400">Select a page to inspect</p>
   </div>
 </template>
 
@@ -127,12 +134,12 @@ import { renderLayoutBlock } from '~/utils/renderer';
 const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
 
-const activeTab = ref('html');
+const activeTab = ref('translated');
 const tabs = [
-  { id: 'html', label: 'Document Render' },
+  { id: 'html', label: 'Preview' },
   { id: 'translated', label: 'Translation' },
-  { id: 'json', label: 'Layout Data' },
-  { id: 'source', label: 'Source Text' },
+  { id: 'json', label: 'Data' },
+  { id: 'source', label: 'Source' },
 ];
 
 const localSource = ref('');
@@ -235,7 +242,7 @@ const deletePage = async () => {
 };
 
 const renderedHtml = computed(() => {
-  if (!page.value?.extracted_json) return '<p style="color: #9ca3af; font-style: italic; text-align: center; margin-top: 4rem;">Awaiting data extraction.</p>';
+  if (!page.value?.extracted_json) return '<p style="color: #64748b; font-style: italic; text-align: center; margin-top: 4rem;">Awaiting data extraction.</p>';
   try {
     const data = JSON.parse(page.value.extracted_json);
     let html = '';
