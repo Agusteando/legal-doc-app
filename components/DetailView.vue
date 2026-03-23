@@ -1,69 +1,72 @@
 <template>
   <div v-if="page" class="h-full flex flex-col bg-slate-900">
-    <!-- Toolbar -->
-    <div class="h-12 border-b border-slate-700 bg-slate-800 flex items-center justify-between px-4 shrink-0">
+    <div class="h-14 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between px-5 shrink-0">
       <div class="flex items-center space-x-3">
-        <h2 class="font-medium text-white">Page {{ page.sort_order }} Inspector</h2>
-        <span class="text-xs text-slate-400 bg-slate-900 px-2 py-1 rounded truncate max-w-[200px]" :title="page.source_filename">
+        <h2 class="font-semibold text-slate-100 text-sm">Page {{ page.sort_order }} Inspector</h2>
+        <span class="text-xs text-slate-400 bg-slate-900 px-2.5 py-1 rounded truncate max-w-[200px] border border-slate-700/50" :title="page.source_filename">
           {{ page.source_filename }}
         </span>
-        <span v-if="page.job_status === 'processing'" class="text-blue-400 text-sm flex items-center"><LoaderIcon class="w-4 h-4 mr-1 animate-spin"/> Processing... {{ page.job_duration_sec }}s</span>
-        <span v-if="page.job_error" class="text-red-400 text-sm truncate max-w-xs" :title="page.job_error">{{ page.job_error }}</span>
+        <div v-if="page.job_status === 'processing'" class="bg-blue-900/30 border border-blue-500/30 text-blue-400 px-2.5 py-1 rounded flex items-center text-xs">
+          <LoaderIcon class="w-3.5 h-3.5 mr-1.5 animate-spin"/> Processing... {{ page.job_duration_sec }}s
+        </div>
+        <div v-if="page.job_error" class="bg-red-900/30 border border-red-500/30 text-red-400 px-2.5 py-1 rounded text-xs truncate max-w-xs" :title="page.job_error">
+          {{ page.job_error }}
+        </div>
       </div>
-      <div class="flex space-x-2">
-        <button @click="toggleExclude" class="p-1.5 rounded hover:bg-slate-700 transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/20' : 'text-slate-400'" title="Toggle Exclude">
+      <div class="flex space-x-1">
+        <button @click="toggleExclude" class="p-2 rounded-md transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/30 hover:bg-red-900/50' : 'text-slate-400 hover:bg-slate-700 hover:text-white'" title="Toggle Exclude">
           <BanIcon class="w-4 h-4" />
         </button>
-        <button @click="rotate" class="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Rotate Image">
+        <button @click="rotate" class="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Rotate Image">
           <RotateCwIcon class="w-4 h-4" />
         </button>
-        <div class="w-px h-6 bg-slate-600 mx-1"></div>
-        <button @click="deletePage" class="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors" title="Delete Page from Stack">
+        <div class="w-px h-6 bg-slate-600 mx-1.5 self-center"></div>
+        <button @click="deletePage" class="p-2 rounded-md text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors" title="Delete Page">
           <TrashIcon class="w-4 h-4" />
         </button>
       </div>
     </div>
 
-    <!-- Split View -->
-    <div class="flex-1 flex min-h-0">
-      <!-- Image Viewer -->
-      <div class="w-1/2 border-r border-slate-700 bg-slate-950 p-4 overflow-auto flex items-center justify-center relative">
-        <img :src="page.image_url" class="max-w-full shadow-2xl transition-transform" :style="{ transform: `rotate(${page.rotation}deg)` }" />
+    <div class="flex-1 flex min-h-0 relative">
+      <div class="w-1/2 border-r border-slate-700 bg-slate-950 p-6 overflow-auto flex items-center justify-center">
+        <img :src="page.image_url" class="max-w-full shadow-2xl transition-transform rounded-sm border border-slate-800" :style="{ transform: `rotate(${page.rotation}deg)` }" />
       </div>
       
-      <!-- Editor / Data Viewer -->
       <div class="w-1/2 flex flex-col bg-slate-900">
-        <!-- Tabs -->
-        <div class="flex border-b border-slate-700 bg-slate-800/50">
+        <div class="flex border-b border-slate-700 bg-slate-800">
           <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
-            class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-            :class="activeTab === tab.id ? 'border-blue-500 text-blue-400 bg-slate-800' : 'border-transparent text-slate-400 hover:text-slate-200'">
+            class="px-5 py-3 text-sm font-medium border-b-2 transition-all outline-none"
+            :class="activeTab === tab.id ? 'border-blue-500 text-blue-400 bg-slate-900' : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'">
             {{ tab.label }}
           </button>
         </div>
         
-        <!-- Content Area -->
-        <div class="flex-1 overflow-auto p-4 text-slate-300 relative">
-          <div v-if="activeTab === 'source'" class="whitespace-pre-wrap font-mono text-sm leading-relaxed">{{ page.source_text || 'No source text extracted.' }}</div>
-          <div v-else-if="activeTab === 'translated'" class="whitespace-pre-wrap text-base leading-relaxed">{{ page.translated_text || 'No translation available.' }}</div>
+        <div class="flex-1 overflow-auto bg-slate-900 p-6 relative">
+          <div v-if="activeTab === 'source'" class="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-300">{{ page.source_text || 'No source text extracted.' }}</div>
+          <div v-else-if="activeTab === 'translated'" class="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-200">{{ page.translated_text || 'No translation available.' }}</div>
           
-          <!-- Canonical JSON Edit -->
           <div v-else-if="activeTab === 'json'" class="h-full flex flex-col">
-            <div class="mb-2 flex justify-between items-center text-xs text-slate-400">
-              <span>Edit canonical data to update HTML output.</span>
-              <button @click="saveJson" class="text-blue-400 hover:text-blue-300">Force Save</button>
+            <div class="mb-3 flex justify-between items-center text-xs text-slate-400 font-medium">
+              <span>Edit canonical data to update layout engine.</span>
+              <button @click="saveJson" class="text-blue-400 hover:text-blue-300 flex items-center bg-blue-900/20 px-2 py-1 rounded">Save Changes</button>
             </div>
-            <textarea v-model="editableJson" @blur="saveJson" class="w-full flex-1 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded border border-slate-700 focus:outline-none focus:border-blue-500 resize-none"></textarea>
+            <textarea v-model="editableJson" @blur="saveJson" class="w-full flex-1 bg-slate-950 text-emerald-400 font-mono text-sm p-4 rounded-md border border-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none shadow-inner"></textarea>
           </div>
           
-          <div v-else-if="activeTab === 'html'" class="prose prose-invert max-w-none" v-html="renderedHtml"></div>
+          <!-- High Fidelity A4 Simulation wrapper -->
+          <div v-else-if="activeTab === 'html'" class="max-w-[21cm] mx-auto bg-white text-black p-12 shadow-2xl rounded-sm min-h-[29.7cm]" style="font-family: 'Merriweather', serif;">
+            <div v-html="renderedHtml"></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-  <div v-else class="h-full flex items-center justify-center text-slate-500 flex-col">
-    <FileTextIcon class="w-12 h-12 mb-4 text-slate-600" />
-    <p>Select a page from the assembled stack to inspect.</p>
+  <div v-else class="h-full flex items-center justify-center text-slate-500 flex-col bg-slate-900">
+    <div class="bg-slate-800 p-6 rounded-full mb-6">
+      <FileTextIcon class="w-12 h-12 text-slate-400" />
+    </div>
+    <p class="text-lg font-medium text-slate-300">No page selected</p>
+    <p class="text-sm mt-2 text-slate-500">Select a page from the document strip to inspect and edit.</p>
   </div>
 </template>
 
@@ -72,16 +75,17 @@ import { ref, computed, watch } from 'vue';
 import { LoaderIcon, BanIcon, RotateCwIcon, TrashIcon, FileTextIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import DOMPurify from 'dompurify';
+import { renderLayoutBlock } from '~/utils/renderer';
 
 const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
 
-const activeTab = ref('translated');
+const activeTab = ref('html');
 const tabs = [
-  { id: 'source', label: 'Source Text' },
-  { id: 'translated', label: 'Translation' },
-  { id: 'json', label: 'Canonical JSON' },
-  { id: 'html', label: 'Rendered HTML' },
+  { id: 'html', label: 'Document Render' },
+  { id: 'json', label: 'Canonical Layout Data' },
+  { id: 'source', label: 'Raw Source Text' },
+  { id: 'translated', label: 'Raw Translation' },
 ];
 
 const editableJson = ref('');
@@ -100,7 +104,7 @@ const saveJson = async () => {
       method: 'PUT', body: { id: page.value.id, extracted_json: compactJson } 
     });
   } catch (e) {
-    alert("Invalid JSON. Cannot save.");
+    alert("Invalid JSON format. Cannot save.");
   }
 };
 
@@ -122,29 +126,26 @@ const rotate = async () => {
 
 const deletePage = async () => {
   if (!page.value) return;
-  if (confirm('Remove this page from the workspace?')) {
+  if (confirm('Permanently remove this page from the workspace?')) {
     await workspace.deletePage(page.value.id);
   }
 };
 
 const renderedHtml = computed(() => {
-  if (!page.value?.extracted_json) return '<i>No data</i>';
+  if (!page.value?.extracted_json) return '<p style="color: #9ca3af; font-style: italic; text-align: center; margin-top: 4rem;">Awaiting data extraction.</p>';
   try {
     const data = JSON.parse(page.value.extracted_json);
     let html = '';
     if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
       data.layout_blocks.forEach(block => {
-        if (block.type === 'heading') html += `<h2 class="text-xl font-bold mt-4 mb-2">${block.translated_content}</h2>`;
-        else if (block.type === 'signature') html += `<div class="p-4 border border-dashed border-slate-600 my-4 text-center text-sm italic text-slate-400">[Signature: ${block.translated_content}]</div>`;
-        else if (block.type === 'stamp') html += `<div class="p-4 border-2 border-red-900/50 rounded my-4 text-center font-bold text-red-400 uppercase tracking-widest">[Stamp: ${block.translated_content}]</div>`;
-        else html += `<p class="mb-3">${block.translated_content}</p>`;
+        html += renderLayoutBlock(block);
       });
     } else {
       html = `<p>${data.translated_text || ''}</p>`;
     }
-    return DOMPurify.sanitize(html);
+    return DOMPurify.sanitize(html, { ADD_ATTR: ['style'] });
   } catch (e) {
-    return `<div class="text-red-400 p-4 border border-red-900 rounded bg-red-950/30">Failed to render HTML from JSON.</div>`;
+    return `<div style="color: #ef4444; padding: 1rem; border: 1px solid #fca5a5; background-color: #fef2f2; border-radius: 0.375rem;">Layout rendering error: invalid structured data.</div>`;
   }
 });
 </script>

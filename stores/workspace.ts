@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Assign worker URL for client-side extraction safely
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
@@ -73,38 +72,46 @@ export const useWorkspaceStore = defineStore('workspace', {
 
         for (const docObj of pdfDocs) {
           for (let i = 1; i <= docObj.pages; i++) {
-            this.uploadStatusText = `Extracting image: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
-            const page = await docObj.pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 }); 
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
+            this.uploadStatusText = `Extracting & Uploading: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
+            // Yield to main thread for smooth progress bar updates
+            await new Promise(r => setTimeout(r, 20));
             
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-            
-            if (!blob) continue;
+            try {
+              const page = await docObj.pdf.getPage(i);
+              const viewport = page.getViewport({ scale: 2.0 }); 
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              
+              await page.render({ canvasContext: ctx, viewport }).promise;
+              const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+              
+              if (!blob) throw new Error("Failed to generate image blob");
 
-            const formData = new FormData();
-            formData.append('document_id', this.document.id);
-            formData.append('source_filename', docObj.file.name);
-            formData.append('page_number', i.toString());
-            formData.append('file', blob);
+              const formData = new FormData();
+              formData.append('document_id', this.document.id);
+              formData.append('source_filename', docObj.file.name);
+              formData.append('page_number', i.toString());
+              formData.append('file', blob);
 
-            this.uploadStatusText = `Uploading to storage: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
-            await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+              await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+            } catch (err: any) {
+              console.error(`Page ${i} extraction/upload error:`, err);
+            }
             
             totalPagesProcessed++;
             this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
           }
         }
+        this.uploadStatusText = 'Finalizing Workspace...';
         await this.fetchWorkspace();
       } catch (err: any) {
         alert('Upload Error: ' + err.message);
       } finally {
         this.isUploading = false;
         this.uploadStatusText = '';
+        this.uploadProgress = 0;
       }
     },
     selectPage(id: string, multi: boolean = false, range: boolean = false) {

@@ -1,11 +1,15 @@
 export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt'],
-  ssr: false, // Strongly client-side driven for the PDF parsing & layout
+  ssr: false, 
   app: {
     head: {
       title: 'Legal PDF Workbench',
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap' }
+      ],
       script: [
-        // Load PDF.js worker from CDN to avoid complex Vite worker bundling issues
         { src: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js' }
       ]
     }

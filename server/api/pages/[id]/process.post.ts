@@ -14,11 +14,19 @@ const schema = {
       items: {
         type: "object",
         properties: {
-          type: { type: "string", enum: ["heading", "paragraph", "signature", "stamp", "table"] },
+          type: { type: "string", enum: ["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field"] },
+          alignment: { type: "string", enum: ["left", "center", "right", "justify"] },
           source_content: { type: "string" },
-          translated_content: { type: "string" }
+          translated_content: { type: "string", description: "Use <b> for bold, <i> for italic, and <u> for underline tags inline where applicable." },
+          form_label: { type: "string", description: "Only if type is form_field" },
+          form_value: { type: "string", description: "Only if type is form_field" },
+          table_data: {
+            type: "array",
+            description: "2D array [row][column] of strings. Top row is headers.",
+            items: { type: "array", items: { type: "string" } }
+          }
         },
-        required: ["type", "source_content", "translated_content"],
+        required: ["type"],
         additionalProperties: false
       }
     }
@@ -41,9 +49,12 @@ export default defineEventHandler(async (event) => {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.4",
+      model: "gpt-4o",
       messages: [
-        { role: "system", content: "Extract and translate the legal document page exactly according to the schema. Return only valid JSON." },
+        { 
+          role: "system", 
+          content: "Extract and translate the legal document page into structured JSON layout blocks. Strictly respect formatting (bold=<b>, italic=<i>, underline=<u>) within translated_content. Identify dividers, alignments, and form field rows carefully." 
+        },
         {
           role: "user",
           content: [
