@@ -14,19 +14,51 @@ const schema = {
       items: {
         type: "object",
         properties: {
-          type: { type: "string", enum: ["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field"] },
-          alignment: { type: "string", enum: ["left", "center", "right", "justify"] },
-          source_content: { type: "string" },
-          translated_content: { type: "string", description: "Use <b> for bold, <i> for italic, and <u> for underline tags inline where applicable." },
-          form_label: { type: "string", description: "Only if type is form_field" },
-          form_value: { type: "string", description: "Only if type is form_field" },
+          type: { 
+            type: "string", 
+            enum: ["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field"] 
+          },
+          alignment: { 
+            type: "string", 
+            enum: ["left", "center", "right", "justify"],
+            description: "Text alignment. Default to 'left' if unsure or not applicable."
+          },
+          source_content: { 
+            type: "string",
+            description: "Raw source text. Empty string if not applicable."
+          },
+          translated_content: { 
+            type: "string", 
+            description: "Translated content. Use <b> for bold, <i> for italic, and <u> for underline tags inline where applicable. Empty string if not applicable." 
+          },
+          form_label: { 
+            type: "string", 
+            description: "Only populate if type is form_field. Otherwise leave as an empty string." 
+          },
+          form_value: { 
+            type: "string", 
+            description: "Only populate if type is form_field. Otherwise leave as an empty string." 
+          },
           table_data: {
             type: "array",
-            description: "2D array [row][column] of strings. Top row is headers.",
-            items: { type: "array", items: { type: "string" } }
+            description: "2D array [row][column] of strings. Top row is headers. Return an empty array [] if type is not a table.",
+            items: { 
+              type: "array", 
+              items: { type: "string" } 
+            }
           }
         },
-        required: ["type"],
+        // In OpenAI strict mode, EVERY property must be explicitly marked as required.
+        // We handle optionality by instructing the model to return empty strings or arrays.
+        required: [
+          "type", 
+          "alignment", 
+          "source_content", 
+          "translated_content", 
+          "form_label", 
+          "form_value", 
+          "table_data"
+        ],
         additionalProperties: false
       }
     }
