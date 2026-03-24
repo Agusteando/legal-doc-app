@@ -1,40 +1,52 @@
 <template>
-  <div class="h-screen w-screen bg-slate-900 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30" style="font-family: 'Inter', sans-serif;">
-    <!-- Initial Loading State -->
-    <div v-if="workspace.isLoadingWorkspace && !workspace.document" class="h-full w-full flex flex-col items-center justify-center bg-slate-900 space-y-4">
-      <LoaderIcon class="w-8 h-8 animate-spin text-blue-500" />
-      <span class="text-slate-400 font-medium text-sm tracking-wide animate-pulse">Loading Workspace...</span>
-    </div>
+  <div class="h-screen w-screen bg-slate-900 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30 flex flex-col relative" style="font-family: 'Inter', sans-serif;">
     
-    <!-- Active Workspace Routing -->
-    <Workspace v-else-if="workspace.document" />
-    <Uploader v-else />
-
-    <!-- Error / Diagnostic Overlay (Fixed bottom right) -->
-    <div v-if="workspace.isErrorState" class="fixed bottom-4 right-4 bg-red-900/95 backdrop-blur border border-red-500 rounded-lg p-5 shadow-2xl max-w-sm z-[90]">
-      <h3 class="text-white font-bold mb-1 flex items-center"><AlertCircleIcon class="w-4 h-4 mr-2" /> Pipeline Error</h3>
-      <p class="text-red-200 text-sm mb-4 leading-snug">{{ workspace.errorMessage }}</p>
-      <div class="flex space-x-3">
-        <button @click="showDiagnostics = true" class="text-xs font-semibold bg-slate-800 text-white px-3 py-2 rounded hover:bg-slate-700 transition-colors">View Logs</button>
-        <button @click="workspace.clearWorkspace()" class="text-xs font-semibold bg-red-600 text-white px-3 py-2 rounded hover:bg-red-500 transition-colors">Reset Session</button>
+    <!-- Main App Container -->
+    <div class="flex-1 relative overflow-hidden transition-all duration-300" :style="showDiag ? 'height: calc(100vh - 18rem);' : 'height: calc(100vh - 2.5rem);'">
+      
+      <!-- Initial Loading State -->
+      <div v-if="workspace.isLoadingWorkspace && !workspace.document" class="h-full w-full flex flex-col items-center justify-center bg-slate-900 space-y-4">
+        <LoaderIcon class="w-8 h-8 animate-spin text-blue-500" />
+        <span class="text-slate-400 font-medium text-sm tracking-wide animate-pulse">Initializing Single-Project Environment...</span>
       </div>
+      
+      <!-- UI Routing Logic: Show Workspace Viewer ONLY if document exists AND has pages. Otherwise show Dropzone. -->
+      <Workspace v-else-if="workspace.document && workspace.pages.length > 0" />
+      <Uploader v-else />
+      
     </div>
 
-    <!-- Full Diagnostics Modal -->
-    <div v-if="showDiagnostics" class="fixed inset-0 bg-slate-950/95 z-[100] flex flex-col p-8 backdrop-blur-sm">
-      <div class="flex justify-between items-center mb-6">
-        <div>
-          <h2 class="text-2xl font-bold text-white mb-1">Diagnostic Logs</h2>
-          <p class="text-sm text-slate-400">End-to-end trace of the upload and fetch pipeline.</p>
+    <!-- HUD / System Diagnostics Panel -->
+    <div class="absolute bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 font-mono text-xs flex flex-col z-[100] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300" :class="showDiag ? 'h-72' : 'h-10'">
+      <!-- Panel Header -->
+      <div class="h-10 shrink-0 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 cursor-pointer text-slate-400 hover:text-slate-200 select-none" @click="showDiag = !showDiag">
+        <div class="flex items-center gap-6">
+          <span class="font-bold tracking-wide flex items-center gap-2 text-slate-300">
+            <TerminalIcon class="w-4 h-4" />
+            SYSTEM DIAGNOSTICS & LOGS
+          </span>
+          <div class="flex items-center gap-4 border-l border-slate-700 pl-4 hidden sm:flex">
+            <span class="text-indigo-400" title="Total Documents in DB">DB Docs: {{ workspace.globalStats.totalDocuments }}</span>
+            <span class="text-emerald-400" title="Total Active Pages in DB">DB Active Pages: {{ workspace.globalStats.totalPages }}</span>
+            <span class="text-red-400" title="Total Deleted Pages in DB">DB Deleted: {{ workspace.globalStats.deletedPages }}</span>
+            <span class="text-amber-400 ml-4">Current UI Route: {{ (workspace.document && workspace.pages.length > 0) ? 'Workspace Viewer' : 'Uploader Screen' }}</span>
+          </div>
         </div>
-        <button @click="showDiagnostics = false" class="text-slate-400 hover:text-white px-4 py-2 border border-slate-700 rounded-lg hover:bg-slate-800 transition-all">Close Console</button>
+        <ChevronUpIcon class="w-4 h-4 transition-transform duration-300" :class="showDiag ? 'rotate-180' : ''" />
       </div>
-      <div class="flex-1 bg-black rounded-lg border border-slate-700 p-6 overflow-y-auto font-mono text-[13px] leading-relaxed text-emerald-400 shadow-inner">
-        <div v-for="(log, idx) in workspace.diagnosticLogs" :key="idx" class="mb-1.5 border-b border-slate-800/50 pb-1.5 last:border-0 hover:bg-slate-900/50 px-2 -mx-2 rounded">
-          <span class="text-slate-500 text-[11px] mr-3">{{ log.time }}</span>
-          <span :class="{'text-red-400 font-bold': log.msg.includes('ERROR'), 'text-blue-400': log.msg.includes('POST') || log.msg.includes('GET')}">{{ log.msg }}</span>
+      
+      <!-- Logs List -->
+      <div class="flex-1 overflow-auto p-4 space-y-1.5 bg-[#0a0a0a]" ref="logContainer">
+        <div v-for="(log, i) in workspace.logs" :key="i" class="flex gap-3 hover:bg-slate-900/50 px-1 -mx-1 rounded transition-colors">
+          <span class="text-slate-600 shrink-0 select-none">[{{ log.time }}]</span>
+          <span class="shrink-0 w-16 font-bold select-none" :class="{
+            'text-blue-500': log.level === 'info',
+            'text-emerald-500': log.level === 'success',
+            'text-amber-500': log.level === 'warn',
+            'text-red-500': log.level === 'error',
+          }">{{ log.level.toUpperCase() }}</span>
+          <span class="text-slate-300 whitespace-pre-wrap break-all">{{ log.msg }}</span>
         </div>
-        <div v-if="!workspace.diagnosticLogs.length" class="text-slate-500 italic text-center mt-10">No logs captured yet.</div>
       </div>
     </div>
   </div>
@@ -42,16 +54,20 @@
 
 <script setup>
 import { useWorkspaceStore } from '~/stores/workspace';
-import { LoaderIcon, AlertCircleIcon } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { LoaderIcon, TerminalIcon, ChevronUpIcon } from 'lucide-vue-next';
+import { onMounted, ref, watch, nextTick } from 'vue';
 
 const workspace = useWorkspaceStore();
-const showDiagnostics = ref(false);
+const showDiag = ref(true); // Open by default initially so you can see it working
+const logContainer = ref(null);
 
-// Always expose to window for debugging via browser console
-if (typeof window !== 'undefined') {
-  window.__WORKSPACE_DEBUG__ = () => { showDiagnostics.value = true; };
-}
+// Auto-scroll logs to bottom
+watch(() => workspace.logs.length, async () => {
+  await nextTick();
+  if (logContainer.value) {
+    logContainer.value.scrollTop = logContainer.value.scrollHeight;
+  }
+});
 
 onMounted(() => workspace.fetchWorkspace());
 </script>

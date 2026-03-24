@@ -2,22 +2,20 @@ import { getDb } from '../../utils/db';
 import { randomUUID } from 'crypto';
 
 export default defineEventHandler(async (event) => {
-  console.log(`[Server API] POST /workspace/init - Request received.`);
+  const db = getDb();
   
   try {
-    const body = await readBody(event);
-    const db = getDb();
+    // Single-project enforcement: Do we already have an active document?
+    const [existing]: any = await db.query(`SELECT * FROM documents ORDER BY created_at DESC LIMIT 1`);
+    if (existing && existing.length > 0) {
+      return { id: existing[0].id };
+    }
+    
+    // Create the global project if absolutely empty
     const docId = randomUUID();
-    const filename = body.filename || 'Assembled Workspace';
-    
-    console.log(`[Server API] Database connection acquired. Generating document ID: ${docId}`);
-    
-    await db.query(`INSERT INTO documents (id, filename) VALUES (?, ?)`, [docId, filename]);
-    console.log(`[Server API] Successfully inserted document ${docId} into DB.`);
-    
+    await db.query(`INSERT INTO documents (id, filename) VALUES (?, ?)`, [docId, 'Active Legal Project']);
     return { id: docId };
   } catch (err: any) {
-    console.error(`[Server API ERROR] POST /workspace/init failed:`, err);
-    throw createError({ statusCode: 500, statusMessage: `Workspace Init DB Error: ${err.message}` });
+    throw createError({ statusCode: 500, statusMessage: `Init Error: ${err.message}` });
   }
 });

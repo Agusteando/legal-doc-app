@@ -5,32 +5,32 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
+export interface LogEntry {
+  time: string;
+  level: 'info' | 'success' | 'warn' | 'error';
+  msg: string;
+}
+
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     let reviewer = '';
-    let activeDocId = null;
-    
-    if (typeof window !== 'undefined') {
-      reviewer = localStorage.getItem('reviewerPref') || '';
-      activeDocId = localStorage.getItem('activeWorkspaceId') || null;
-    }
+    if (typeof window !== 'undefined') reviewer = localStorage.getItem('reviewerPref') || '';
     
     return {
-      activeDocId: activeDocId as string | null,
       document: null as any,
       pages: [] as any[],
       selectedPageIds: new Set<string>(),
       lastSelectedId: null as string | null,
+      
       isUploading: false,
       uploadStatusText: '',
       uploadProgress: 0,
       reviewerPref: reviewer,
-      isLoadingWorkspace: !!activeDocId,
+      isLoadingWorkspace: true,
       
       // Diagnostic tracking
-      diagnosticLogs: [] as { time: string, msg: string }[],
-      isErrorState: false,
-      errorMessage: '',
+      logs: [] as LogEntry[],
+      globalStats: { totalDocuments: 0, totalPages: 0, deletedPages: 0 }
     };
   },
   getters: {
@@ -40,87 +40,70 @@ export const useWorkspaceStore = defineStore('workspace', {
     sourceFiles: (state) => Array.from(new Set(state.pages.filter(p => !p.is_deleted).map(p => p.source_filename)))
   },
   actions: {
-    logDiagnostic(msg: string) {
-      const entry = { time: new Date().toISOString().split('T')[1].replace('Z', ''), msg };
-      this.diagnosticLogs.push(entry);
-      console.log(`[Diagnostic] ${msg}`);
+    log(level: 'info' | 'success' | 'warn' | 'error', msg: string) {
+      const time = new Date().toISOString().split('T')[1].replace('Z', '');
+      this.logs.push({ time, level, msg });
+      console.log(`[${level.toUpperCase()}] ${msg}`);
     },
     updateReviewerPref(name: string) {
       this.reviewerPref = name;
       if (typeof window !== 'undefined') localStorage.setItem('reviewerPref', name);
     },
-    clearWorkspace() {
-      this.activeDocId = null;
-      this.document = null;
-      this.pages = [];
-      this.selectedPageIds.clear();
-      this.lastSelectedId = null;
-      this.isErrorState = false;
-      this.errorMessage = '';
-      this.diagnosticLogs = [];
-      if (typeof window !== 'undefined') localStorage.removeItem('activeWorkspaceId');
-    },
     async fetchWorkspace() {
-      this.logDiagnostic(`fetchWorkspace triggered for ID: ${this.activeDocId || 'none'}`);
-      if (!this.activeDocId) {
-        this.isLoadingWorkspace = false;
-        return;
-      }
-      
       this.isLoadingWorkspace = true;
-      this.isErrorState = false;
-      this.errorMessage = '';
+      this.log('info', 'Booting application. Requesting current global project from /api/workspace/current...');
       
       try {
-        this.logDiagnostic(`GET /api/workspace/${this.activeDocId}`);
-        const data: any = await $fetch(`/api/workspace/${this.activeDocId}`);
+        const data: any = await $fetch(`/api/workspace/current`);
+        
+        if (data.stats) {
+          this.globalStats = data.stats;
+          this.log('success', `DB Reachable. Global Stats -> Docs: ${data.stats.totalDocuments}, Pages: ${data.stats.totalPages}, Deleted Pages: ${data.stats.deletedPages}`);
+        }
         
         if (data && data.document) {
-          this.logDiagnostic(`Fetch SUCCESS: Document "${data.document.filename}" loaded with ${data.pages?.length || 0} pages.`);
+          this.log('success', `Found active project document [ID: ${data.document.id}]. Recovered ${data.pages?.length || 0} active pages.`);
           this.document = data.document;
           this.pages = data.pages || [];
+          
           if (this.pages.length && !this.lastSelectedId) {
             this.selectPage(this.orderedPages[0]?.id, false, false);
           }
+          
+          if (this.pages.length > 0) {
+            this.log('info', 'UI Router Decision: Active document + Pages > 0. Showing Workspace Viewer.');
+          } else {
+            this.log('warn', 'UI Router Decision: Document exists but has 0 active pages. Showing Upload Screen.');
+          }
         } else {
-          this.logDiagnostic(`ERROR: Fetch returned 200 OK but payload was empty or missing 'document' key.`);
-          throw new Error("Invalid response payload from server.");
+          this.log('warn', `No documents found in DB. UI Router Decision: Showing Upload Screen.`);
+          this.document = null;
+          this.pages = [];
         }
       } catch (err: any) {
-        this.logDiagnostic(`ERROR during fetchWorkspace: ${err.message || err.statusMessage}`);
-        console.error('Fetch Workspace Error:', err);
-        this.isErrorState = true;
-        this.errorMessage = "Failed to load workspace data: " + (err.message || err.statusMessage);
+        this.log('error', `CRITICAL: Failed to fetch from DB -> ${err.message || err.statusMessage}`);
       } finally {
         this.isLoadingWorkspace = false;
       }
     },
     async addFiles(files: File[]) {
-      this.logDiagnostic(`addFiles initiated with ${files.length} files.`);
+      this.log('info', `addFiles triggered with ${files.length} PDFs.`);
       if (!files.length) return;
       this.isUploading = true;
       this.uploadProgress = 0;
-      this.isErrorState = false;
       
       let uploadErrors: string[] = [];
       
       try {
         if (!this.document) {
-          this.uploadStatusText = 'Creating Workspace...';
-          this.logDiagnostic(`POST /api/workspace/init`);
-          const res: any = await $fetch('/api/workspace/init', { method: 'POST', body: { filename: 'Assembled Workspace' } });
+          this.uploadStatusText = 'Initializing Single Project...';
+          this.log('info', `No active document in state. Hitting /api/workspace/init to fetch or create global project.`);
+          const res: any = await $fetch('/api/workspace/init', { method: 'POST' });
           
-          if (!res || !res.id) {
-            this.logDiagnostic(`ERROR: /api/workspace/init returned invalid payload: ${JSON.stringify(res)}`);
-            throw new Error("Server failed to return a valid Workspace ID.");
-          }
-
-          this.logDiagnostic(`Workspace Init SUCCESS. ID: ${res.id}`);
-          this.activeDocId = res.id;
-          if (typeof window !== 'undefined') localStorage.setItem('activeWorkspaceId', res.id);
+          if (!res || !res.id) throw new Error("Server failed to return a valid Project ID.");
+          this.log('success', `Global Project ID acquired: ${res.id}`);
           
-          // Optimistically lock the UI into the workspace immediately
-          this.document = { id: res.id, filename: 'Assembled Workspace', status: 'open' };
+          this.document = { id: res.id, filename: 'Active Legal Project', status: 'open' };
           this.pages = [];
         }
 
@@ -129,34 +112,30 @@ export const useWorkspaceStore = defineStore('workspace', {
         const pdfDocs: { pdf: any, file: File, pages: number }[] = [];
 
         this.uploadStatusText = 'Reading PDFs...';
-        this.logDiagnostic(`Parsing PDFs via pdfjs-dist worker...`);
+        this.log('info', 'Parsing PDFs via pdfjs-dist worker...');
+        
         for (const file of files) {
           try {
-            this.logDiagnostic(`Reading buffer for ${file.name} (${Math.round(file.size/1024)} KB)`);
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            this.logDiagnostic(`Parsed ${file.name} successfully. Found ${pdf.numPages} pages.`);
+            this.log('success', `Parsed ${file.name} successfully. Found ${pdf.numPages} pages.`);
             totalPagesExpected += pdf.numPages;
             pdfDocs.push({ pdf, file, pages: pdf.numPages });
           } catch (pdfErr: any) {
-             this.logDiagnostic(`ERROR reading PDF ${file.name}: ${pdfErr.message}`);
-             uploadErrors.push(`Failed to read ${file.name}: ${pdfErr.message}`);
+             this.log('error', `Failed to parse PDF ${file.name}: ${pdfErr.message}`);
+             uploadErrors.push(`Failed to read ${file.name}`);
           }
         }
 
-        if (totalPagesExpected === 0) {
-          throw new Error("No pages could be extracted from the uploaded PDFs.");
-        }
-
-        this.logDiagnostic(`Beginning extraction loop for ${totalPagesExpected} total pages.`);
+        if (totalPagesExpected === 0) throw new Error("No pages could be extracted from the uploaded PDFs.");
+        this.log('info', `Beginning Canvas render and Casita upload loop for ${totalPagesExpected} pages.`);
 
         for (const docObj of pdfDocs) {
           for (let i = 1; i <= docObj.pages; i++) {
             this.uploadStatusText = `Extracting: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
-            await new Promise(r => setTimeout(r, 20)); // UI Breather
+            await new Promise(r => setTimeout(r, 20)); 
             
             try {
-              this.logDiagnostic(`Rendering canvas for page ${i} of ${docObj.file.name}`);
               const page = await docObj.pdf.getPage(i);
               const viewport = page.getViewport({ scale: 2.0 }); 
               const canvas = document.createElement('canvas');
@@ -168,8 +147,6 @@ export const useWorkspaceStore = defineStore('workspace', {
               canvas.height = viewport.height;
               
               await page.render({ canvasContext: ctx, viewport }).promise;
-              
-              this.logDiagnostic(`Converting canvas to Blob...`);
               const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
               if (!blob) throw new Error("Canvas toBlob conversion failed.");
 
@@ -179,60 +156,47 @@ export const useWorkspaceStore = defineStore('workspace', {
               formData.append('page_number', i.toString());
               formData.append('file', blob);
 
-              this.logDiagnostic(`POST /api/pages/upload for page ${i}. Blob size: ${Math.round(blob.size/1024)} KB`);
               const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
               
-              if (!uploadRes || !uploadRes.id) {
-                 this.logDiagnostic(`ERROR: Upload response invalid: ${JSON.stringify(uploadRes)}`);
-                 throw new Error("Invalid response from server during page upload.");
-              }
-              this.logDiagnostic(`Upload SUCCESS for page ${i}. DB Page ID: ${uploadRes.id}, Order: ${uploadRes.sort_order}`);
+              if (!uploadRes || !uploadRes.id) throw new Error("Invalid response from server during page upload.");
+              this.log('success', `Uploaded ${docObj.file.name} Page ${i}. DB ID: ${uploadRes.id}`);
               
               totalPagesProcessed++;
               this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
             } catch (err: any) { 
-              this.logDiagnostic(`ERROR during extraction/upload of page ${i}: ${err.message}`);
-              console.error(`Page ${i} extraction error:`, err); 
-              uploadErrors.push(`Page ${i} error: ${err.message || 'Network/Server Error'}`);
+              this.log('error', `Failed upload on ${docObj.file.name} Page ${i}: ${err.message}`);
+              uploadErrors.push(`Page ${i} error: ${err.message}`);
             }
           }
         }
         
-        this.logDiagnostic(`Extraction loop completed. Processed: ${totalPagesProcessed}/${totalPagesExpected}. Errors: ${uploadErrors.length}`);
-        
-        this.uploadStatusText = 'Finalizing Workspace...';
+        this.log('info', `Extraction completed. Uploaded ${totalPagesProcessed} of ${totalPagesExpected}. Finalizing...`);
+        this.uploadStatusText = 'Finalizing View...';
         await this.fetchWorkspace();
         
         if (uploadErrors.length > 0) {
-          this.isErrorState = true;
-          this.errorMessage = `Upload completed with ${uploadErrors.length} errors. Review diagnostics. First issue: ${uploadErrors[0]}`;
-        } else if (totalPagesProcessed === 0) {
-           this.isErrorState = true;
-           this.errorMessage = "Critical Error: All pages failed to process. View logs for details.";
+          this.log('error', `Upload sequence finished with ${uploadErrors.length} errors.`);
+          alert(`Upload completed with ${uploadErrors.length} errors. See Diagnostic Panel.`);
         }
       } catch (err: any) { 
-        this.logDiagnostic(`CRITICAL ERROR in addFiles sequence: ${err.message}`);
-        console.error("Critical Upload Error:", err);
-        this.isErrorState = true;
-        this.errorMessage = err.message || 'Upload sequence suffered a critical failure.';
+        this.log('error', `FATAL Upload Sequence Error: ${err.message}`);
+        alert('Upload Sequence Failed: ' + (err.message || 'Server error')); 
       } finally { 
         this.isUploading = false; 
         this.uploadStatusText = ''; 
         this.uploadProgress = 0; 
       }
     },
-    // Keep other actions exactly as before...
+    // Keep other actions identical...
     async replaceSourceFile(oldFilename: string, newFile: File) {
       if (!this.document) return;
       this.isUploading = true;
       this.uploadProgress = 0;
-      
       try {
         const arrayBuffer = await newFile.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const totalPages = pdf.numPages;
         const newPagesData = [];
-
         for (let i = 1; i <= totalPages; i++) {
           this.uploadStatusText = `Replacing: ${oldFilename} -> ${newFile.name} (Page ${i}/${totalPages})`;
           await new Promise(r => setTimeout(r, 20));
@@ -242,35 +206,25 @@ export const useWorkspaceStore = defineStore('workspace', {
           const ctx = canvas.getContext('2d');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          
           await page.render({ canvasContext: ctx, viewport }).promise;
           const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-          
           const formData = new FormData();
           formData.append('document_id', this.document.id);
           formData.append('source_filename', 'TEMP_REPLACE'); 
           formData.append('page_number', '0'); 
           formData.append('file', blob as Blob);
-          
           const res: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
           newPagesData.push({ page_number: i, image_url: res.image_url });
           this.uploadProgress = Math.round((i / totalPages) * 100);
         }
-
         this.uploadStatusText = 'Updating Assembly...';
         await $fetch('/api/documents/replace-file', {
           method: 'POST',
           body: { document_id: this.document.id, old_filename: oldFilename, new_filename: newFile.name, new_pages: newPagesData }
         });
-
         await this.fetchWorkspace();
-      } catch (err: any) {
-        alert('Replacement Error: ' + err.message);
-      } finally {
-        this.isUploading = false;
-        this.uploadStatusText = '';
-        this.uploadProgress = 0;
-      }
+      } catch (err: any) { alert('Replacement Error: ' + err.message); } 
+      finally { this.isUploading = false; this.uploadStatusText = ''; this.uploadProgress = 0; }
     },
     selectPage(id: string, multi: boolean = false, range: boolean = false) {
       if (!id) return;
@@ -312,7 +266,6 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (!page) continue;
         page.job_status = 'processing';
         page.job_duration_sec = 0;
-        
         const timer = setInterval(() => page.job_duration_sec++, 1000);
         try {
           const res: any = await $fetch(`/api/pages/${id}/process`, { method: 'POST' });
@@ -351,6 +304,12 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.selectedPageIds.delete(id);
         if (this.lastSelectedId === id) this.lastSelectedId = null;
         await $fetch('/api/pages/update', { method: 'PUT', body: { id, is_deleted: true } });
+        
+        // If they delete the absolute last page, fetchWorkspace will drop them cleanly to the Uploader
+        if (this.pages.every(p => p.is_deleted)) {
+          this.log('warn', 'All pages deleted. Reloading state to fallback to Uploader.');
+          this.fetchWorkspace();
+        }
       }
     }
   }

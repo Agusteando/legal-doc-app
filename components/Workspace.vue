@@ -7,17 +7,13 @@
           <div class="w-8 h-8 bg-blue-600/20 text-blue-500 rounded-lg flex items-center justify-center border border-blue-500/30">
             <FilesIcon class="w-4 h-4" />
           </div>
-          <h1 class="font-semibold text-slate-100 text-[15px] tracking-tight">{{ workspace.document?.filename || 'Legal Workbench' }}</h1>
+          <h1 class="font-semibold text-slate-100 text-[15px] tracking-tight">{{ workspace.document?.filename || 'Active Legal Project' }}</h1>
         </div>
         
         <div class="h-6 w-px bg-slate-800"></div>
         
         <button @click="isFilesModalOpen = true" class="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors flex items-center">
           Source Files
-        </button>
-        
-        <button @click="createNewWorkspace" class="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors flex items-center">
-          New Workspace
         </button>
       </div>
 
@@ -72,19 +68,13 @@ const workspace = useWorkspaceStore();
 const isExporting = ref(false);
 const isFilesModalOpen = ref(false);
 
-const createNewWorkspace = () => {
-  if(confirm('Are you sure you want to close this workspace and start a new one? You can still access this workspace later if you have its ID.')) {
-    workspace.clearWorkspace();
-  }
-};
-
 const exportPdf = async () => {
   if (!workspace.document) return;
   isExporting.value = true;
   try {
     const res = await $fetch(`/api/workspace/${workspace.document.id}/export`);
     if (res.html) {
-      // Native print engine: bypasses Vercel limits completely, creating perfect selectable PDFs.
+      // Native print engine
       const printWin = window.open('', '_blank');
       if (printWin) {
         printWin.document.open();
