@@ -7,7 +7,7 @@ if (typeof window !== 'undefined') {
 
 export interface LogEntry {
   time: string;
-  level: 'info' | 'success' | 'warn' | 'error';
+  level: 'info' | 'success' | 'warn' | 'error' | 'debug';
   msg: string;
 }
 
@@ -40,7 +40,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     sourceFiles: (state) => Array.from(new Set(state.pages.filter(p => !p.is_deleted).map(p => p.source_filename)))
   },
   actions: {
-    log(level: 'info' | 'success' | 'warn' | 'error', msg: string) {
+    log(level: 'info' | 'success' | 'warn' | 'error' | 'debug', msg: string) {
       const time = new Date().toISOString().split('T')[1].replace('Z', '');
       this.logs.push({ time, level, msg });
       console.log(`[${level.toUpperCase()}] ${msg}`);
@@ -59,21 +59,39 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (data.stats) {
           this.globalStats = data.stats;
           this.log('success', `DB Reachable. Global Stats -> Docs: ${data.stats.totalDocuments}, Pages: ${data.stats.totalPages}, Deleted Pages: ${data.stats.deletedPages}`);
+          
+          // Deep Debug Grouping
+          if (data.stats.allPagesRaw && data.stats.allPagesRaw.length > 0) {
+            const groupings = data.stats.allPagesRaw.reduce((acc: any, page: any) => {
+              const status = page.is_deleted ? 'deleted' : 'active';
+              if (!acc[page.document_id]) acc[page.document_id] = { active: 0, deleted: 0 };
+              acc[page.document_id][status]++;
+              return acc;
+            }, {});
+            this.log('debug', `Raw DB Page Distribution:\n` + Object.entries(groupings).map(([docId, counts]: any) => `  -> Doc [${docId}]: ${counts.active} active, ${counts.deleted} deleted`).join('\n'));
+          }
+        }
+        
+        if (data.selectionReason) {
+          this.log('info', `Server Selection Logic: ${data.selectionReason}`);
         }
         
         if (data && data.document) {
           this.log('success', `Found active project document [ID: ${data.document.id}]. Recovered ${data.pages?.length || 0} active pages.`);
-          this.document = data.document;
+          
           this.pages = data.pages || [];
           
           if (this.pages.length && !this.lastSelectedId) {
             this.selectPage(this.orderedPages[0]?.id, false, false);
           }
           
-          if (this.pages.length > 0) {
-            this.log('info', 'UI Router Decision: Active document + Pages > 0. Showing Workspace Viewer.');
+          // STRICT UI ROUTING LOGIC: Do not mount document state if it has 0 pages and we aren't uploading.
+          if (this.pages.length === 0 && !this.isUploading) {
+            this.log('warn', `UI Router Decision: Document exists but has 0 active pages. Nullifying local state to force Uploader screen.`);
+            this.document = null;
           } else {
-            this.log('warn', 'UI Router Decision: Document exists but has 0 active pages. Showing Upload Screen.');
+            this.log('success', `UI Router Decision: Active document is valid. Rendering Workspace Viewer.`);
+            this.document = data.document;
           }
         } else {
           this.log('warn', `No documents found in DB. UI Router Decision: Showing Upload Screen.`);
@@ -187,7 +205,6 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.uploadProgress = 0; 
       }
     },
-    // Keep other actions identical...
     async replaceSourceFile(oldFilename: string, newFile: File) {
       if (!this.document) return;
       this.isUploading = true;

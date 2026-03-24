@@ -10,8 +10,8 @@
         <span class="text-slate-400 font-medium text-sm tracking-wide animate-pulse">Initializing Single-Project Environment...</span>
       </div>
       
-      <!-- UI Routing Logic: Show Workspace Viewer ONLY if document exists AND has pages. Otherwise show Dropzone. -->
-      <Workspace v-else-if="workspace.document && workspace.pages.length > 0" />
+      <!-- UI Routing Logic (State Managed Securely in Store) -->
+      <Workspace v-else-if="workspace.document" />
       <Uploader v-else />
       
     </div>
@@ -29,7 +29,7 @@
             <span class="text-indigo-400" title="Total Documents in DB">DB Docs: {{ workspace.globalStats.totalDocuments }}</span>
             <span class="text-emerald-400" title="Total Active Pages in DB">DB Active Pages: {{ workspace.globalStats.totalPages }}</span>
             <span class="text-red-400" title="Total Deleted Pages in DB">DB Deleted: {{ workspace.globalStats.deletedPages }}</span>
-            <span class="text-amber-400 ml-4">Current UI Route: {{ (workspace.document && workspace.pages.length > 0) ? 'Workspace Viewer' : 'Uploader Screen' }}</span>
+            <span class="text-amber-400 ml-4">Current UI Route: {{ workspace.document ? 'Workspace Viewer' : 'Uploader Screen' }}</span>
           </div>
         </div>
         <ChevronUpIcon class="w-4 h-4 transition-transform duration-300" :class="showDiag ? 'rotate-180' : ''" />
@@ -44,6 +44,7 @@
             'text-emerald-500': log.level === 'success',
             'text-amber-500': log.level === 'warn',
             'text-red-500': log.level === 'error',
+            'text-purple-400': log.level === 'debug',
           }">{{ log.level.toUpperCase() }}</span>
           <span class="text-slate-300 whitespace-pre-wrap break-all">{{ log.msg }}</span>
         </div>
@@ -58,10 +59,9 @@ import { LoaderIcon, TerminalIcon, ChevronUpIcon } from 'lucide-vue-next';
 import { onMounted, ref, watch, nextTick } from 'vue';
 
 const workspace = useWorkspaceStore();
-const showDiag = ref(true); // Open by default initially so you can see it working
+const showDiag = ref(true); 
 const logContainer = ref(null);
 
-// Auto-scroll logs to bottom
 watch(() => workspace.logs.length, async () => {
   await nextTick();
   if (logContainer.value) {
