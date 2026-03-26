@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
   if (body.approval_2_name !== undefined) { updates.push('approval_2_name = ?'); values.push(body.approval_2_name); }
   if (body.approval_2_status !== undefined) { updates.push('approval_2_status = ?'); values.push(body.approval_2_status); }
   
-  // Handles setting to NULL when reverting to Auto-Assembly
-  if (body.manual_html_override !== undefined) { updates.push('manual_html_override = ?'); values.push(body.manual_html_override); }
+  // Wipe legacy override column to guarantee deterministic pipeline
+  updates.push('manual_html_override = NULL');
 
   if (updates.length > 0) {
     values.push(body.id);

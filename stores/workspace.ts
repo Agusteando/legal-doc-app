@@ -330,14 +330,6 @@ export const useWorkspaceStore = defineStore('workspace', {
           this.fetchWorkspace();
         }
       }
-    },
-    async saveDocumentHtml(html: string | null) {
-      if (!this.document) return;
-      this.document.manual_html_override = html;
-      await $fetch('/api/documents/update', { 
-        method: 'PUT', 
-        body: { id: this.document.id, manual_html_override: html } 
-      });
     }
   }
 });

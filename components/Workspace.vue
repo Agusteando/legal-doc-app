@@ -31,7 +31,7 @@
           :class="workspace.viewMode === 'editor' ? 'bg-slate-700 text-white shadow-sm ring-1 ring-slate-600' : 'text-slate-400 hover:text-slate-200'" 
           class="px-5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center">
           <FileSignatureIcon class="w-4 h-4 mr-2" />
-          Final Document
+          Composed Output
         </button>
       </div>
 
@@ -48,7 +48,7 @@
 
     <!-- Dynamic Workspace Area -->
     <div class="flex flex-1 min-h-0 relative">
-      <PageStrip v-show="workspace.viewMode === 'review'" class="w-[260px] border-r border-slate-800 bg-slate-950 flex-shrink-0" />
+      <PageStrip class="w-[260px] border-r border-slate-800 bg-slate-950 flex-shrink-0" />
       
       <DetailView v-if="workspace.viewMode === 'review'" class="flex-1 min-w-0" />
       <DocumentEditor v-if="workspace.viewMode === 'editor'" class="flex-1 min-w-0" />

@@ -14,41 +14,53 @@ export default defineEventHandler(async (event) => {
     const doc = docs[0];
     const filename = doc.filename.replace(/\s+/g, '_') + '_Export.pdf';
     
-    // 1. Get the finalized HTML (Either the user override, or compile fresh)
-    let innerHtml = doc.manual_html_override;
+    // Strict JSON -> HTML pipeline compilation
+    const [pages]: any = await db.query(`
+      SELECT extracted_json FROM pages 
+      WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
+      ORDER BY sort_order ASC
+    `, [id]);
     
-    if (!innerHtml) {
-      const [pages]: any = await db.query(`
-        SELECT extracted_json FROM pages 
-        WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
-        ORDER BY sort_order ASC
-      `, [id]);
-      
-      innerHtml = '';
-      for (const page of pages) {
-        if (page.extracted_json) {
-          try {
-            const data = JSON.parse(page.extracted_json);
-            if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
-              data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
-            }
-            innerHtml += '<div class="page-break" style="page-break-after: always;"></div>\n';
-          } catch (e) {}
-        }
+    let innerHtml = '';
+    for (const page of pages) {
+      if (page.extracted_json) {
+        try {
+          const data = JSON.parse(page.extracted_json);
+          // Force a strict container around each page to guarantee 1:1 printing
+          innerHtml += `<div class="page-container">\n`;
+          if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
+            data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
+          }
+          innerHtml += `</div>\n`;
+        } catch (e) {}
       }
     }
 
-    // 2. Wrap HTML in the identical layout context used by DocumentEditor.vue
+    // Wrap HTML in a print-ready document structure
     const fullHtml = `
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Caveat:wght@500;700&display=swap');
-          @page { size: letter; margin: 1in; }
-          body { font-family: 'Merriweather', serif; color: #000; margin: 0; padding: 0; font-size: 11pt; line-height: 1.6; background: #fff; }
-          .page-break { page-break-after: always; }
+          /* Strict Print Styling */
+          @page { size: letter; margin: 0; }
+          body { 
+            margin: 0; 
+            padding: 0; 
+            background: #fff; 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact;
+          }
+          .page-container { 
+            width: 8.5in; 
+            height: 11in; 
+            padding: 1in; 
+            box-sizing: border-box; 
+            overflow: hidden; 
+            page-break-after: always;
+            position: relative;
+          }
         </style>
       </head>
       <body>
@@ -59,7 +71,7 @@ export default defineEventHandler(async (event) => {
 
     console.log(`[Export Pipeline] Dispatching Render Request for ${filename}`);
     
-    // 3. Robust external service call using multi-layered Auth headers
+    // External service call using multi-layered Auth headers
     const renderResponse: any = await $fetch(`${config.renderServiceUrl}/render-pdf`, {
       method: 'POST',
       headers: {

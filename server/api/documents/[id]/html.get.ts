@@ -5,10 +5,9 @@ export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
   const db = getDb();
 
-  const [docs]: any = await db.query(`SELECT manual_html_override FROM documents WHERE id = ? LIMIT 1`, [id]);
+  const [docs]: any = await db.query(`SELECT id FROM documents WHERE id = ? LIMIT 1`, [id]);
   if (!docs.length) throw createError({ statusCode: 404, statusMessage: 'Document not found.' });
 
-  // 1. Compute the deterministic HTML from the current JSON pages
   const [pages]: any = await db.query(`
     SELECT extracted_json FROM pages 
     WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
@@ -20,22 +19,20 @@ export default defineEventHandler(async (event) => {
     if (page.extracted_json) {
       try {
         const data = JSON.parse(page.extracted_json);
+        computedHtml += `<div class="page-container" style="width: 8.5in; height: 11in; padding: 1in; box-sizing: border-box; overflow: hidden; page-break-after: always; position: relative;">\n`;
         if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
           data.layout_blocks.forEach((block: any) => computedHtml += renderLayoutBlock(block));
         }
-        computedHtml += '<div class="page-break" style="page-break-after: always;"></div>\n';
+        computedHtml += `</div>\n`;
       } catch (e) {
         console.warn("Skipped invalid JSON block during compile");
       }
     }
   }
 
-  // 2. Determine state: Are we serving the auto-assembly, or a manual override?
-  const manualOverride = docs[0].manual_html_override;
-
   return { 
-    is_override: !!manualOverride,
-    html: manualOverride || computedHtml || '<p style="color:#94a3b8; font-style:italic; text-align:center; padding-top: 2rem;">No extracted page data found yet. Process pages to begin document assembly.</p>',
+    is_override: false,
+    html: computedHtml || '<p style="color:#94a3b8; font-style:italic; text-align:center; padding-top: 2rem;">No extracted page data found yet. Process pages to begin document assembly.</p>',
     computed_html: computedHtml
   };
 });
