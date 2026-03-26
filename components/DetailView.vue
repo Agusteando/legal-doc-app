@@ -1,7 +1,7 @@
 <template>
   <div v-if="page" class="h-full flex bg-slate-950 overflow-hidden relative">
     
-    <!-- CENTER: Document Image Viewer (Fluid, max space) -->
+    <!-- CENTER: Document Image Viewer -->
     <div class="flex-1 flex flex-col min-w-0 bg-[#0f1117] relative">
       <div class="absolute top-4 left-4 z-10 flex space-x-2">
         <div class="bg-slate-900/80 backdrop-blur border border-slate-700/50 rounded-lg p-1.5 flex space-x-1 shadow-lg">
@@ -28,8 +28,8 @@
       </div>
     </div>
 
-    <!-- RIGHT: Inspector Panel (450px fixed) -->
-    <div class="w-[450px] shrink-0 border-l border-slate-800 bg-slate-900 flex flex-col shadow-2xl z-10">
+    <!-- RIGHT: Inspector Panel -->
+    <div class="w-[500px] shrink-0 border-l border-slate-800 bg-slate-900 flex flex-col shadow-2xl z-10">
       
       <!-- Inspector Header & Meta -->
       <div class="p-5 border-b border-slate-800 bg-slate-900">
@@ -62,55 +62,68 @@
       </div>
 
       <!-- Editor Tabs -->
-      <div class="flex px-2 pt-2 border-b border-slate-800 bg-slate-900/50">
+      <div class="flex px-2 pt-2 border-b border-slate-800 bg-slate-900/50 shrink-0">
         <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
           class="px-4 py-2.5 text-xs font-medium border-b-2 transition-all outline-none relative"
           :class="activeTab === tab.id ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'">
           {{ tab.label }}
-          <span v-if="dirtyFlags[tab.id]" class="absolute top-2 right-1 w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+          <span v-if="(tab.id === 'review' && (dirtyFlags.source || dirtyFlags.translated)) || (tab.id === 'json' && dirtyFlags.json)" class="absolute top-2 right-1 w-1.5 h-1.5 rounded-full bg-blue-500"></span>
         </button>
       </div>
       
       <!-- Editor Content Area -->
       <div class="flex-1 flex flex-col min-h-0 bg-slate-950 relative">
-        <div v-if="activeTab === 'source'" class="h-full flex flex-col p-4">
-          <div class="mb-3 flex justify-between items-center">
-            <span class="text-xs text-slate-500">Raw source OCR.</span>
-            <button @click="saveSource" :disabled="!dirtyFlags.source" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.source ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'">Save</button>
-          </div>
-          <textarea v-model="localSource" class="w-full flex-1 bg-transparent text-slate-300 font-mono text-[13px] leading-relaxed p-0 border-none focus:ring-0 resize-none outline-none"></textarea>
-        </div>
-
-        <div v-else-if="activeTab === 'translated'" class="h-full flex flex-col p-4">
-          <div class="mb-3 flex justify-between items-center">
-            <span class="text-xs text-slate-500">Edit translation text.</span>
+        
+        <!-- Bilingual Side-By-Side Review Area -->
+        <div v-if="activeTab === 'review'" class="h-full flex flex-col p-4">
+          <div class="mb-3 flex justify-between items-center shrink-0">
+            <span class="text-xs text-slate-500">Review Source OCR alongside Translation.</span>
             <div class="flex space-x-2">
               <button @click="syncLayout" :disabled="dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50 flex items-center transition-colors" title="Sync layout blocks">
-                <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" :class="{'animate-spin': isSyncing}" /> Sync
+                <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" :class="{'animate-spin': isSyncing}" /> Sync Layout
               </button>
-              <button @click="saveTranslation" :disabled="!dirtyFlags.translated" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.translated ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'">Save</button>
+              <button @click="saveReview" :disabled="!dirtyFlags.source && !dirtyFlags.translated" class="text-xs font-medium px-4 py-1.5 rounded shadow disabled:opacity-50 transition-colors" :class="(dirtyFlags.source || dirtyFlags.translated) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'">Save Changes</button>
             </div>
           </div>
-          <textarea v-model="localTranslation" class="w-full flex-1 bg-transparent text-slate-200 text-[14px] leading-relaxed p-0 border-none focus:ring-0 resize-none outline-none"></textarea>
+          
+          <div class="flex-1 flex space-x-4 min-h-0">
+            <div class="flex-1 flex flex-col border border-slate-800 rounded-lg overflow-hidden bg-[#0a0c10]">
+              <div class="bg-slate-900 border-b border-slate-800 px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex justify-between shrink-0">
+                <span>Spanish Source</span>
+                <span v-if="dirtyFlags.source" class="text-amber-500 font-medium">Unsaved</span>
+              </div>
+              <textarea v-model="localSource" class="w-full flex-1 bg-transparent text-slate-400 font-mono text-[12px] leading-relaxed p-3 border-none focus:ring-0 resize-none outline-none"></textarea>
+            </div>
+            
+            <div class="flex-1 flex flex-col border border-slate-800 rounded-lg overflow-hidden bg-[#0f1117] shadow-inner">
+              <div class="bg-slate-900 border-b border-slate-800 px-3 py-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest flex justify-between shrink-0">
+                <span>English Translation</span>
+                <span v-if="dirtyFlags.translated" class="text-amber-500 font-medium">Unsaved</span>
+              </div>
+              <textarea v-model="localTranslation" class="w-full flex-1 bg-transparent text-slate-200 text-[13px] leading-relaxed p-3 border-none focus:ring-0 resize-none outline-none"></textarea>
+            </div>
+          </div>
         </div>
         
+        <!-- Strict Layout JSON Panel -->
         <div v-else-if="activeTab === 'json'" class="h-full flex flex-col p-4">
           <div class="mb-3 flex justify-between items-center">
-            <span class="text-xs text-slate-500">Edit strict layout blocks.</span>
-            <button @click="saveJson" :disabled="!dirtyFlags.json" class="text-xs font-medium px-3 py-1.5 rounded disabled:opacity-50 transition-colors" :class="dirtyFlags.json ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'">Save JSON</button>
+            <span class="text-xs text-slate-500">Edit strict structural blocks.</span>
+            <button @click="saveJson" :disabled="!dirtyFlags.json" class="text-xs font-medium px-4 py-1.5 rounded shadow disabled:opacity-50 transition-colors" :class="dirtyFlags.json ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'">Save JSON</button>
           </div>
           <textarea v-model="localJson" class="w-full flex-1 bg-transparent text-emerald-400 font-mono text-[12px] leading-relaxed p-0 border-none focus:ring-0 resize-none outline-none"></textarea>
         </div>
         
-        <div v-else-if="activeTab === 'html'" class="h-full overflow-y-auto w-full bg-slate-200">
+        <!-- HTML Document Preview Panel -->
+        <div v-else-if="activeTab === 'preview'" class="h-full overflow-y-auto w-full bg-slate-200">
           <div class="w-full bg-white text-black p-8 min-h-full" style="font-family: 'Merriweather', serif; font-size: 10pt;">
             <div v-html="renderedHtml"></div>
           </div>
         </div>
       </div>
 
-      <!-- Notes Panel (Bottom Fixed) -->
-      <div class="p-4 border-t border-slate-800 bg-slate-900 shrink-0 h-36 flex flex-col">
+      <!-- Internal Notes Panel -->
+      <div class="p-4 border-t border-slate-800 bg-slate-900 shrink-0 h-32 flex flex-col">
         <label class="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wide">Internal Notes</label>
         <textarea v-model="localNotes" @blur="saveMetadata" placeholder="Add review notes, translator comments, or tags..." class="w-full flex-1 bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none placeholder-slate-700"></textarea>
       </div>
@@ -134,12 +147,11 @@ import { renderLayoutBlock } from '~/utils/renderer';
 const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
 
-const activeTab = ref('translated');
+const activeTab = ref('review');
 const tabs = [
-  { id: 'html', label: 'Preview' },
-  { id: 'translated', label: 'Translation' },
-  { id: 'json', label: 'Data' },
-  { id: 'source', label: 'Source' },
+  { id: 'review', label: 'Bilingual Review' },
+  { id: 'json', label: 'Data (JSON)' },
+  { id: 'preview', label: 'Preview' }
 ];
 
 const localSource = ref('');
@@ -184,16 +196,20 @@ const saveMetadata = async () => {
   });
 };
 
-const saveSource = async () => {
+const saveReview = async () => {
   if (!page.value) return;
-  await workspace.updatePageInfo(page.value.id, { source_text: localSource.value });
-  dirtyFlags.source = false;
-};
-
-const saveTranslation = async () => {
-  if (!page.value) return;
-  await workspace.updatePageInfo(page.value.id, { translated_text: localTranslation.value, is_manual_translation: true });
-  dirtyFlags.translated = false;
+  const updates = {};
+  if (dirtyFlags.source) updates.source_text = localSource.value;
+  if (dirtyFlags.translated) {
+    updates.translated_text = localTranslation.value;
+    updates.is_manual_translation = true;
+  }
+  
+  if (Object.keys(updates).length > 0) {
+    await workspace.updatePageInfo(page.value.id, updates);
+    dirtyFlags.source = false;
+    dirtyFlags.translated = false;
+  }
 };
 
 const saveJson = async () => {

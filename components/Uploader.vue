@@ -44,12 +44,12 @@ const isDragging = ref(false);
 const handleDrop = (e) => {
   isDragging.value = false;
   const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type === 'application/pdf');
-  if (files.length) workspace.addFiles(files);
+  if (files.length) workspace.insertFiles(files);
 };
 
 const handleFile = (e) => {
   const files = Array.from(e.target.files || []).filter(f => f.type === 'application/pdf');
-  if (files.length) workspace.addFiles(files);
+  if (files.length) workspace.insertFiles(files);
   e.target.value = null; // reset input
 };
 </script>

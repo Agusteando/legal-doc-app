@@ -28,7 +28,6 @@ export const useWorkspaceStore = defineStore('workspace', {
       reviewerPref: reviewer,
       isLoadingWorkspace: true,
       
-      // Diagnostic tracking
       logs: [] as LogEntry[],
       globalStats: { totalDocuments: 0, totalPages: 0, deletedPages: 0 }
     };
@@ -51,150 +50,111 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
     async fetchWorkspace() {
       this.isLoadingWorkspace = true;
-      this.log('info', 'Booting application. Requesting current global project from /api/workspace/current...');
-      
       try {
         const data: any = await $fetch(`/api/workspace/current`);
-        
-        if (data.stats) {
-          this.globalStats = data.stats;
-          this.log('success', `DB Reachable. Global Stats -> Docs: ${data.stats.totalDocuments}, Pages: ${data.stats.totalPages}, Deleted Pages: ${data.stats.deletedPages}`);
-          
-          // Deep Debug Grouping
-          if (data.stats.allPagesRaw && data.stats.allPagesRaw.length > 0) {
-            const groupings = data.stats.allPagesRaw.reduce((acc: any, page: any) => {
-              const status = page.is_deleted ? 'deleted' : 'active';
-              if (!acc[page.document_id]) acc[page.document_id] = { active: 0, deleted: 0 };
-              acc[page.document_id][status]++;
-              return acc;
-            }, {});
-            this.log('debug', `Raw DB Page Distribution:\n` + Object.entries(groupings).map(([docId, counts]: any) => `  -> Doc [${docId}]: ${counts.active} active, ${counts.deleted} deleted`).join('\n'));
-          }
-        }
-        
-        if (data.selectionReason) {
-          this.log('info', `Server Selection Logic: ${data.selectionReason}`);
-        }
-        
+        if (data.stats) this.globalStats = data.stats;
         if (data && data.document) {
-          this.log('success', `Found active project document [ID: ${data.document.id}]. Recovered ${data.pages?.length || 0} active pages.`);
-          
           this.pages = data.pages || [];
-          
           if (this.pages.length && !this.lastSelectedId) {
             this.selectPage(this.orderedPages[0]?.id, false, false);
           }
-          
-          // STRICT UI ROUTING LOGIC: Do not mount document state if it has 0 pages and we aren't uploading.
           if (this.pages.length === 0 && !this.isUploading) {
-            this.log('warn', `UI Router Decision: Document exists but has 0 active pages. Nullifying local state to force Uploader screen.`);
             this.document = null;
           } else {
-            this.log('success', `UI Router Decision: Active document is valid. Rendering Workspace Viewer.`);
             this.document = data.document;
           }
         } else {
-          this.log('warn', `No documents found in DB. UI Router Decision: Showing Upload Screen.`);
           this.document = null;
           this.pages = [];
         }
       } catch (err: any) {
-        this.log('error', `CRITICAL: Failed to fetch from DB -> ${err.message || err.statusMessage}`);
+        this.log('error', `DB Fetch Error: ${err.message}`);
       } finally {
         this.isLoadingWorkspace = false;
       }
     },
-    async addFiles(files: File[]) {
-      this.log('info', `addFiles triggered with ${files.length} PDFs.`);
+    async insertFiles(files: File[], insertAfterId?: string) {
+      this.log('info', `insertFiles triggered with ${files.length} PDFs. Target anchor: ${insertAfterId || 'END'}`);
       if (!files.length) return;
       this.isUploading = true;
       this.uploadProgress = 0;
       
-      let uploadErrors: string[] = [];
-      
       try {
         if (!this.document) {
           this.uploadStatusText = 'Initializing Single Project...';
-          this.log('info', `No active document in state. Hitting /api/workspace/init to fetch or create global project.`);
           const res: any = await $fetch('/api/workspace/init', { method: 'POST' });
-          
           if (!res || !res.id) throw new Error("Server failed to return a valid Project ID.");
-          this.log('success', `Global Project ID acquired: ${res.id}`);
-          
           this.document = { id: res.id, filename: 'Active Legal Project', status: 'open' };
           this.pages = [];
         }
 
-        let totalPagesProcessed = 0;
         let totalPagesExpected = 0;
         const pdfDocs: { pdf: any, file: File, pages: number }[] = [];
 
         this.uploadStatusText = 'Reading PDFs...';
-        this.log('info', 'Parsing PDFs via pdfjs-dist worker...');
         
         for (const file of files) {
-          try {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            this.log('success', `Parsed ${file.name} successfully. Found ${pdf.numPages} pages.`);
-            totalPagesExpected += pdf.numPages;
-            pdfDocs.push({ pdf, file, pages: pdf.numPages });
-          } catch (pdfErr: any) {
-             this.log('error', `Failed to parse PDF ${file.name}: ${pdfErr.message}`);
-             uploadErrors.push(`Failed to read ${file.name}`);
-          }
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          totalPagesExpected += pdf.numPages;
+          pdfDocs.push({ pdf, file, pages: pdf.numPages });
         }
 
         if (totalPagesExpected === 0) throw new Error("No pages could be extracted from the uploaded PDFs.");
-        this.log('info', `Beginning Canvas render and Casita upload loop for ${totalPagesExpected} pages.`);
+
+        let totalPagesProcessed = 0;
+        const uploadedIds: string[] = [];
 
         for (const docObj of pdfDocs) {
           for (let i = 1; i <= docObj.pages; i++) {
             this.uploadStatusText = `Extracting: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
             await new Promise(r => setTimeout(r, 20)); 
             
-            try {
-              const page = await docObj.pdf.getPage(i);
-              const viewport = page.getViewport({ scale: 2.0 }); 
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              
-              if (!ctx) throw new Error("Could not construct local 2D canvas context.");
-              
-              canvas.width = viewport.width;
-              canvas.height = viewport.height;
-              
-              await page.render({ canvasContext: ctx, viewport }).promise;
-              const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-              if (!blob) throw new Error("Canvas toBlob conversion failed.");
+            const page = await docObj.pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 }); 
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error("Canvas context failed.");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
 
-              const formData = new FormData();
-              formData.append('document_id', this.document.id);
-              formData.append('source_filename', docObj.file.name);
-              formData.append('page_number', i.toString());
-              formData.append('file', blob);
+            const formData = new FormData();
+            formData.append('document_id', this.document.id);
+            formData.append('source_filename', docObj.file.name);
+            formData.append('page_number', i.toString());
+            formData.append('file', blob as Blob);
 
-              const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
-              
-              if (!uploadRes || !uploadRes.id) throw new Error("Invalid response from server during page upload.");
-              this.log('success', `Uploaded ${docObj.file.name} Page ${i}. DB ID: ${uploadRes.id}`);
-              
-              totalPagesProcessed++;
-              this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
-            } catch (err: any) { 
-              this.log('error', `Failed upload on ${docObj.file.name} Page ${i}: ${err.message}`);
-              uploadErrors.push(`Page ${i} error: ${err.message}`);
-            }
+            const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+            uploadedIds.push(uploadRes.id);
+            
+            totalPagesProcessed++;
+            this.uploadProgress = Math.round((totalPagesProcessed / totalPagesExpected) * 100);
           }
         }
         
-        this.log('info', `Extraction completed. Uploaded ${totalPagesProcessed} of ${totalPagesExpected}. Finalizing...`);
-        this.uploadStatusText = 'Finalizing View...';
+        this.uploadStatusText = 'Finalizing Assembly...';
         await this.fetchWorkspace();
         
-        if (uploadErrors.length > 0) {
-          this.log('error', `Upload sequence finished with ${uploadErrors.length} errors.`);
-          alert(`Upload completed with ${uploadErrors.length} errors. See Diagnostic Panel.`);
+        if (insertAfterId && uploadedIds.length > 0) {
+           const list = [...this.orderedPages];
+           const newPages = list.filter(p => uploadedIds.includes(p.id));
+           const filteredList = list.filter(p => !uploadedIds.includes(p.id));
+           
+           if (insertAfterId === 'START') {
+              filteredList.unshift(...newPages);
+           } else {
+              const targetIdx = filteredList.findIndex(p => p.id === insertAfterId);
+              if (targetIdx !== -1) {
+                 filteredList.splice(targetIdx + 1, 0, ...newPages);
+              } else {
+                 filteredList.push(...newPages);
+              }
+           }
+           await this.updatePageOrder(filteredList.map(p => p.id));
+           await this.fetchWorkspace();
         }
       } catch (err: any) { 
         this.log('error', `FATAL Upload Sequence Error: ${err.message}`);
@@ -205,43 +165,75 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.uploadProgress = 0; 
       }
     },
-    async replaceSourceFile(oldFilename: string, newFile: File) {
+    async replacePage(pageId: string, file: File) {
       if (!this.document) return;
       this.isUploading = true;
       this.uploadProgress = 0;
+      this.uploadStatusText = 'Replacing Page...';
+      
       try {
-        const arrayBuffer = await newFile.arrayBuffer();
+        const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const totalPages = pdf.numPages;
-        const newPagesData = [];
+        
+        let targetId = pageId;
+        const newPageIds: string[] = [];
+        
         for (let i = 1; i <= totalPages; i++) {
-          this.uploadStatusText = `Replacing: ${oldFilename} -> ${newFile.name} (Page ${i}/${totalPages})`;
+          this.uploadStatusText = `Extracting Replacement: ${file.name} (Page ${i}/${totalPages})`;
           await new Promise(r => setTimeout(r, 20));
+          
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 }); 
+          const viewport = page.getViewport({ scale: 2.0 });
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
+          if (!ctx) continue;
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           await page.render({ canvasContext: ctx, viewport }).promise;
           const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+          if (!blob) continue;
+          
           const formData = new FormData();
-          formData.append('document_id', this.document.id);
-          formData.append('source_filename', 'TEMP_REPLACE'); 
-          formData.append('page_number', '0'); 
           formData.append('file', blob as Blob);
-          const res: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
-          newPagesData.push({ page_number: i, image_url: res.image_url });
+          
+          if (i === 1) {
+             // Replace existing database record visually
+             await $fetch(`/api/pages/${targetId}/replace`, { method: 'POST', body: formData });
+          } else {
+             // If a multi-page PDF is dropped, append the rest
+             formData.append('document_id', this.document.id);
+             formData.append('source_filename', file.name);
+             formData.append('page_number', i.toString());
+             const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+             newPageIds.push(uploadRes.id);
+          }
           this.uploadProgress = Math.round((i / totalPages) * 100);
         }
-        this.uploadStatusText = 'Updating Assembly...';
-        await $fetch('/api/documents/replace-file', {
-          method: 'POST',
-          body: { document_id: this.document.id, old_filename: oldFilename, new_filename: newFile.name, new_pages: newPagesData }
-        });
+        
+        // Re-inject any extra pages right after the replaced page
+        if (newPageIds.length > 0) {
+           this.uploadStatusText = 'Reordering...';
+           await this.fetchWorkspace(); 
+           const list = [...this.orderedPages];
+           const targetIdx = list.findIndex(p => p.id === targetId);
+           if (targetIdx !== -1) {
+              const newPages = list.filter(p => newPageIds.includes(p.id));
+              const filteredList = list.filter(p => !newPageIds.includes(p.id));
+              filteredList.splice(targetIdx + 1, 0, ...newPages);
+              await this.updatePageOrder(filteredList.map(p => p.id));
+           }
+        }
+        
         await this.fetchWorkspace();
-      } catch (err: any) { alert('Replacement Error: ' + err.message); } 
-      finally { this.isUploading = false; this.uploadStatusText = ''; this.uploadProgress = 0; }
+        this.selectPage(targetId);
+      } catch (err: any) {
+        alert('Replacement Sequence Failed: ' + (err.message || 'Server error'));
+      } finally {
+        this.isUploading = false;
+        this.uploadStatusText = '';
+        this.uploadProgress = 0;
+      }
     },
     selectPage(id: string, multi: boolean = false, range: boolean = false) {
       if (!id) return;
@@ -322,7 +314,6 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (this.lastSelectedId === id) this.lastSelectedId = null;
         await $fetch('/api/pages/update', { method: 'PUT', body: { id, is_deleted: true } });
         
-        // If they delete the absolute last page, fetchWorkspace will drop them cleanly to the Uploader
         if (this.pages.every(p => p.is_deleted)) {
           this.log('warn', 'All pages deleted. Reloading state to fallback to Uploader.');
           this.fetchWorkspace();
