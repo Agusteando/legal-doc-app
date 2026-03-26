@@ -22,6 +22,26 @@ const schema = {
             type: "string", 
             enum: ["left", "center", "right", "justify"]
           },
+          spacing_before: {
+            type: "string",
+            enum: ["none", "small", "medium", "large", "xlarge"]
+          },
+          spacing_after: {
+            type: "string",
+            enum: ["none", "small", "medium", "large", "xlarge"]
+          },
+          font_size: {
+            type: "string",
+            enum: ["small", "normal", "large", "xlarge"]
+          },
+          font_weight: {
+            type: "string",
+            enum: ["normal", "bold"]
+          },
+          indentation: {
+            type: "string",
+            enum: ["none", "small", "medium", "large"]
+          },
           source_content: { type: "string" },
           translated_content: { type: "string" },
           form_label: { type: "string" },
@@ -40,7 +60,12 @@ const schema = {
         },
         required:[
           "type", 
-          "alignment", 
+          "alignment",
+          "spacing_before",
+          "spacing_after",
+          "font_size",
+          "font_weight",
+          "indentation",
           "source_content", 
           "translated_content", 
           "form_label", 
@@ -56,15 +81,15 @@ const schema = {
   additionalProperties: false
 };
 
-const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks. You are an expert at parsing complex Latin American legal layouts. Break the document down granularly.
+const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks prioritizing absolute structural and vertical fidelity.
 
 CRITICAL HARD REQUIREMENTS:
-1. PRESERVE LEGAL FIDELITY: Reconstruct paragraphs, true line breaks, headers, font size hierarchy, spacing, and overall text density EXACTLY as they appear visually.
-2. USE TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings to mirror physical document line wrapping perfectly.
-3. NEVER invent placeholders like 'Signature here' or 'Circular stamp with text'. Extract legible text ONLY. If it is illegible, do NOT extract or describe it.
-4. NO DECORATIVE INVENTIONS: Do not invent fake separators, borders, or aesthetic padding. The goal is an exact professional reproduction, not beautification.
-5. Use 'table' strictly for tabular data or multi-column structural alignment to match layout spacing.
-6. Respect text formatting (<b>, <i>, <u>). Use <big> or <small> for drastic size changes.`;
+1. VERTICAL RHYTHM & SPACING: Treat spacing as first-class layout data. Accurately capture blank-line separation and vertical gaps between distinct sections using \`spacing_before\` and \`spacing_after\` (none, small, medium, large, xlarge). Do NOT collapse disconnected paragraphs into single blocks.
+2. TYPOGRAPHIC HIERARCHY: Identify headers, titles, and body text explicitly using \`font_size\` (small, normal, large, xlarge) and \`font_weight\` (normal, bold). 
+3. INDENTATION & ALIGNMENT: Capture explicit nested clauses, pushed-in blocks, or offset text using \`indentation\` (none, small, medium, large) and \`alignment\`.
+4. LABELS VS VALUES: For distinct key-value pairs or structured fields, strictly use the \`form_field\` type with separate \`form_label\` and \`form_value\`.
+5. TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings to mirror physical document line wrapping exactly.
+6. NO DECORATIONS: Do not invent fake separators or aesthetics. Never use placeholders like 'signature here'. Extract legible text ONLY. Exact professional reproduction is the goal.`;
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
@@ -103,7 +128,7 @@ export default defineEventHandler(async (event) => {
         {
           role: "user",
           content:[
-            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks prioritizing absolute line break and spacing fidelity." },
+            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks prioritizing absolute structural spacing and hierarchy fidelity." },
             { type: "image_url", image_url: { url: base64ImageUrl } }
           ]
         }

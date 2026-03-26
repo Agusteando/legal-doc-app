@@ -12,6 +12,11 @@ const schema = {
         properties: {
           type: { type: "string", enum:["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field", "handwritten_note", "list"] },
           alignment: { type: "string", enum: ["left", "center", "right", "justify"] },
+          spacing_before: { type: "string", enum: ["none", "small", "medium", "large", "xlarge"] },
+          spacing_after: { type: "string", enum: ["none", "small", "medium", "large", "xlarge"] },
+          font_size: { type: "string", enum: ["small", "normal", "large", "xlarge"] },
+          font_weight: { type: "string", enum: ["normal", "bold"] },
+          indentation: { type: "string", enum: ["none", "small", "medium", "large"] },
           source_content: { type: "string" },
           translated_content: { type: "string" },
           form_label: { type: "string" },
@@ -19,7 +24,7 @@ const schema = {
           table_data: { type: "array", items: { type: "array", items: { type: "string" } } },
           list_items: { type: "array", items: { type: "string" } }
         },
-        required:["type", "alignment", "source_content", "translated_content", "form_label", "form_value", "table_data", "list_items"],
+        required:["type", "alignment", "spacing_before", "spacing_after", "font_size", "font_weight", "indentation", "source_content", "translated_content", "form_label", "form_value", "table_data", "list_items"],
         additionalProperties: false
       }
     }
@@ -45,7 +50,7 @@ export default defineEventHandler(async (event) => {
       messages:[
         { 
           role: "system", 
-          content: "You are a layout packager. Take the provided manually edited translation text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Preserve physical line breaks exactly using explicit \\n. Assign realistic structural blocks ensuring professional and exact document fidelity without adding any decorative inventions." 
+          content: "You are a legal layout packager. Take the provided manually edited text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Preserve physical line breaks exactly using explicit \\n. Assign realistic structural blocks, font sizes, weights, and crucial vertical spacing (`spacing_before`, `spacing_after`) to ensure professional document fidelity matching typical legal hierarchy." 
         },
         { role: "user", content: `Repackage this text into layout blocks:\n\n${body.translated_text}` }
       ],
