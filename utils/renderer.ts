@@ -1,3 +1,4 @@
+// The deterministic JSON to HTML compiler logic shared across API and Export workflows.
 export function renderLayoutBlock(block: any): string {
   const align = block.alignment ? `text-align: ${block.alignment};` : 'text-align: left;';
   const content = block.translated_content || ''; 

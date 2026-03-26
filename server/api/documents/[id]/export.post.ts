@@ -1,4 +1,5 @@
 import { getDb } from '../../../utils/db';
+import { renderLayoutBlock } from '../../../../utils/renderer';
 import { useRuntimeConfig } from '#imports';
 
 export default defineEventHandler(async (event) => {
@@ -13,12 +14,15 @@ export default defineEventHandler(async (event) => {
     const doc = docs[0];
     const filename = doc.filename.replace(/\s+/g, '_') + '_Export.pdf';
     
+    // 1. Get the finalized HTML (Either the user override, or compile fresh)
     let innerHtml = doc.manual_html_override;
     
     if (!innerHtml) {
-      const [pages]: any = await db.query(`SELECT extracted_json FROM pages WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE ORDER BY sort_order ASC`, [id]);
-      
-      const { renderLayoutBlock } = await import('../../../../utils/renderer');
+      const [pages]: any = await db.query(`
+        SELECT extracted_json FROM pages 
+        WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
+        ORDER BY sort_order ASC
+      `, [id]);
       
       innerHtml = '';
       for (const page of pages) {
@@ -34,6 +38,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    // 2. Wrap HTML in the identical layout context used by DocumentEditor.vue
     const fullHtml = `
       <!DOCTYPE html>
       <html lang="en">
@@ -42,7 +47,7 @@ export default defineEventHandler(async (event) => {
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&family=Caveat:wght@500;700&display=swap');
           @page { size: letter; margin: 1in; }
-          body { font-family: 'Merriweather', serif; color: #111827; margin: 0; padding: 0; font-size: 11pt; line-height: 1.6; background: #fff; }
+          body { font-family: 'Merriweather', serif; color: #000; margin: 0; padding: 0; font-size: 11pt; line-height: 1.6; background: #fff; }
           .page-break { page-break-after: always; }
         </style>
       </head>
@@ -52,9 +57,9 @@ export default defineEventHandler(async (event) => {
       </html>
     `;
 
-    console.log(`[Export Util] Dispatching PDF render request to ${config.renderServiceUrl}...`);
+    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}`);
     
-    // Robust, redundant multi-layered auth payload to bypass strict VM gateway strips.
+    // 3. Robust external service call using multi-layered Auth headers
     const renderResponse: any = await $fetch(`${config.renderServiceUrl}/render-pdf`, {
       method: 'POST',
       headers: {

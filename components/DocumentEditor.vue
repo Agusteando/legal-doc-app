@@ -43,13 +43,18 @@
     </div>
     
     <!-- Virtual Paper Canvas -->
-    <div class="flex-1 overflow-auto p-8 flex justify-center custom-scrollbar">
-      <div v-if="isLoading" class="flex items-center justify-center flex-col text-slate-500 mt-20">
-         <LoaderIcon class="w-8 h-8 animate-spin mb-4 text-blue-500" />
-         <span class="text-sm font-medium">Assembling Final Document...</span>
+    <div class="flex-1 overflow-auto p-8 flex justify-center custom-scrollbar relative">
+      
+      <!-- Loader Overlay (Ensures editorRef stays in the DOM to avoid injection race conditions) -->
+      <div v-show="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-slate-200/80 backdrop-blur-sm">
+         <div class="flex flex-col items-center text-slate-500">
+           <LoaderIcon class="w-8 h-8 animate-spin mb-4 text-blue-500" />
+           <span class="text-sm font-medium">Assembling Document Pipeline...</span>
+         </div>
       </div>
+
+      <!-- The Editor -->
       <div 
-        v-else
         ref="editorRef"
         contenteditable="true" 
         @input="onInput"
@@ -61,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { BoldIcon, ItalicIcon, UnderlineIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, ListIcon, EraserIcon, LoaderIcon, CheckCircleIcon, RefreshCwIcon, AlertTriangleIcon, LinkIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import Approvals from './Approvals.vue';
@@ -79,8 +84,8 @@ const exec = (command, value = null) => {
   onInput(); 
 };
 
-onMounted(async () => {
-  await loadContent();
+onMounted(() => {
+  loadContent();
 });
 
 onUnmounted(() => {
@@ -92,22 +97,31 @@ const loadContent = async () => {
   try {
     const res = await $fetch(`/api/documents/${workspace.document.id}/html`);
     isOverride.value = res.is_override;
-    await new Promise(r => setTimeout(r, 0)); // Yield to let DOM mount ref
+    
+    await nextTick(); // Guarantee the DOM is ready
     if (editorRef.value) {
       editorRef.value.innerHTML = res.html;
+    } else {
+      console.error("Editor Ref not found in DOM");
     }
-  } catch(e) { console.error(e); }
-  finally { isLoading.value = false; }
+  } catch(e) { 
+    console.error(e); 
+    if (editorRef.value) editorRef.value.innerHTML = '<p style="color:red;">Error loading document.</p>';
+  } finally { 
+    isLoading.value = false; 
+  }
 };
 
 const resetToAuto = async () => {
   if (!confirm("This will erase any manual formatting done in this editor and re-assemble the document directly from the underlying Review Pages. Continue?")) return;
+  isLoading.value = true;
   await workspace.saveDocumentHtml(null);
   await loadContent();
 };
 
 const onInput = () => {
-  if (!isOverride.value) isOverride.value = true; // Visually switch mode immediately
+  if (!isOverride.value) isOverride.value = true; // Visually detach immediately
+  
   if (saveTimeout) clearTimeout(saveTimeout);
   saveSuccess.value = false;
   isSaving.value = true;
@@ -122,3 +136,9 @@ const onInput = () => {
   }, 1000);
 };
 </script>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 14px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #cbd5e1; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; border: 3px solid #cbd5e1; }
+</style>
