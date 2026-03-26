@@ -22,6 +22,8 @@ export const useWorkspaceStore = defineStore('workspace', {
       selectedPageIds: new Set<string>(),
       lastSelectedId: null as string | null,
       
+      viewMode: 'review' as 'review' | 'editor',
+      
       isUploading: false,
       uploadStatusText: '',
       uploadProgress: 0,
@@ -47,6 +49,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     updateReviewerPref(name: string) {
       this.reviewerPref = name;
       if (typeof window !== 'undefined') localStorage.setItem('reviewerPref', name);
+    },
+    setViewMode(mode: 'review' | 'editor') {
+      this.viewMode = mode;
     },
     async fetchWorkspace() {
       this.isLoadingWorkspace = true;
@@ -74,7 +79,6 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
     async insertFiles(files: File[], insertAfterId?: string) {
-      this.log('info', `insertFiles triggered with ${files.length} PDFs. Target anchor: ${insertAfterId || 'END'}`);
       if (!files.length) return;
       this.isUploading = true;
       this.uploadProgress = 0;
@@ -198,10 +202,8 @@ export const useWorkspaceStore = defineStore('workspace', {
           formData.append('file', blob as Blob);
           
           if (i === 1) {
-             // Replace existing database record visually
              await $fetch(`/api/pages/${targetId}/replace`, { method: 'POST', body: formData });
           } else {
-             // If a multi-page PDF is dropped, append the rest
              formData.append('document_id', this.document.id);
              formData.append('source_filename', file.name);
              formData.append('page_number', i.toString());
@@ -211,7 +213,6 @@ export const useWorkspaceStore = defineStore('workspace', {
           this.uploadProgress = Math.round((i / totalPages) * 100);
         }
         
-        // Re-inject any extra pages right after the replaced page
         if (newPageIds.length > 0) {
            this.uploadStatusText = 'Reordering...';
            await this.fetchWorkspace(); 
@@ -315,10 +316,17 @@ export const useWorkspaceStore = defineStore('workspace', {
         await $fetch('/api/pages/update', { method: 'PUT', body: { id, is_deleted: true } });
         
         if (this.pages.every(p => p.is_deleted)) {
-          this.log('warn', 'All pages deleted. Reloading state to fallback to Uploader.');
           this.fetchWorkspace();
         }
       }
+    },
+    async saveDocumentHtml(html: string | null) {
+      if (!this.document) return;
+      this.document.manual_html_override = html;
+      await $fetch('/api/documents/update', { 
+        method: 'PUT', 
+        body: { id: this.document.id, manual_html_override: html } 
+      });
     }
   }
 });

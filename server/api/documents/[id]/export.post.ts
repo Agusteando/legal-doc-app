@@ -13,14 +13,11 @@ export default defineEventHandler(async (event) => {
     const doc = docs[0];
     const filename = doc.filename.replace(/\s+/g, '_') + '_Export.pdf';
     
-    // 1. Get the finalized HTML from the WYSIWYG editor
     let innerHtml = doc.manual_html_override;
     
-    // Fallback if they bypassed the WYSIWYG editor
     if (!innerHtml) {
       const [pages]: any = await db.query(`SELECT extracted_json FROM pages WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE ORDER BY sort_order ASC`, [id]);
       
-      // FIX: 4 levels up to reach the root /utils folder
       const { renderLayoutBlock } = await import('../../../../utils/renderer');
       
       innerHtml = '';
@@ -37,7 +34,6 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // 2. Wrap the inner HTML in a print-ready document structure
     const fullHtml = `
       <!DOCTYPE html>
       <html lang="en">
@@ -56,24 +52,27 @@ export default defineEventHandler(async (event) => {
       </html>
     `;
 
-    // 3. Send the HTML payload to the external Ubuntu VM Render Service
+    console.log(`[Export Util] Dispatching PDF render request to ${config.renderServiceUrl}...`);
+    
+    // Robust multi-layered auth payload to survive strict API Gateways
     const renderResponse: any = await $fetch(`${config.renderServiceUrl}/render-pdf`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.renderServiceToken}`
+        'Authorization': `Bearer ${config.renderServiceToken}`,
+        'x-api-key': config.renderServiceToken,
+        'Content-Type': 'application/json'
       },
       body: {
         html: fullHtml,
-        filename: filename
+        filename: filename,
+        token: config.renderServiceToken 
       }
     });
 
-    // 4. Validate the response from the microservice
     if (!renderResponse.success || !renderResponse.url) {
       throw new Error(renderResponse.error || "Render service failed to return a valid PDF URL.");
     }
 
-    // 5. Return the finalized storage URL to the client
     return { success: true, url: renderResponse.url };
 
   } catch (err: any) {

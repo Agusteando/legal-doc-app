@@ -1,27 +1,27 @@
 <template>
-  <div class="h-screen w-screen bg-slate-900 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30 flex flex-col relative" style="font-family: 'Inter', sans-serif;">
+  <div class="h-screen w-screen bg-slate-950 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30 flex flex-col relative" style="font-family: 'Inter', sans-serif;">
     
     <!-- Main App Container -->
     <div class="flex-1 relative overflow-hidden transition-all duration-300" :style="showDiag ? 'height: calc(100vh - 18rem);' : 'height: calc(100vh - 2.5rem);'">
       
       <!-- Initial Loading State -->
-      <div v-if="workspace.isLoadingWorkspace && !workspace.document" class="h-full w-full flex flex-col items-center justify-center bg-slate-900 space-y-4">
+      <div v-if="workspace.isLoadingWorkspace && !workspace.document" class="h-full w-full flex flex-col items-center justify-center bg-slate-950 space-y-4">
         <LoaderIcon class="w-8 h-8 animate-spin text-blue-500" />
         <span class="text-slate-400 font-medium text-sm tracking-wide animate-pulse">Initializing Single-Project Environment...</span>
       </div>
       
-      <!-- UI Routing Logic (State Managed Securely in Store) -->
+      <!-- UI Routing Logic -->
       <Workspace v-else-if="workspace.document" />
       <Uploader v-else />
       
     </div>
 
-    <!-- HUD / System Diagnostics Panel -->
-    <div class="absolute bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 font-mono text-xs flex flex-col z-[100] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300" :class="showDiag ? 'h-72' : 'h-10'">
+    <!-- HUD / System Diagnostics Panel (Default Hidden) -->
+    <div class="absolute bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-800 font-mono text-xs flex flex-col z-[100] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300" :class="showDiag ? 'h-72' : 'h-10'">
       <!-- Panel Header -->
-      <div class="h-10 shrink-0 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 cursor-pointer text-slate-400 hover:text-slate-200 select-none" @click="showDiag = !showDiag">
+      <div class="h-10 shrink-0 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 cursor-pointer text-slate-500 hover:text-slate-300 select-none transition-colors" @click="showDiag = !showDiag">
         <div class="flex items-center gap-6">
-          <span class="font-bold tracking-wide flex items-center gap-2 text-slate-300">
+          <span class="font-bold tracking-wide flex items-center gap-2 text-slate-400">
             <TerminalIcon class="w-4 h-4" />
             SYSTEM DIAGNOSTICS & LOGS
           </span>
@@ -59,7 +59,7 @@ import { LoaderIcon, TerminalIcon, ChevronUpIcon } from 'lucide-vue-next';
 import { onMounted, ref, watch, nextTick } from 'vue';
 
 const workspace = useWorkspaceStore();
-const showDiag = ref(true); 
+const showDiag = ref(false); // Default to calm workspace
 const logContainer = ref(null);
 
 watch(() => workspace.logs.length, async () => {

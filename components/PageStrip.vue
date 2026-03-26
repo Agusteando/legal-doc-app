@@ -1,24 +1,27 @@
 <template>
-  <div class="flex flex-col h-full overflow-hidden bg-slate-900 border-r border-slate-800 shadow-xl z-20">
-    <div class="p-4 border-b border-slate-800 flex justify-between items-center shrink-0 bg-slate-900">
+  <div class="flex flex-col h-full overflow-hidden bg-slate-950 shadow-xl z-20">
+    
+    <!-- Utility Header -->
+    <div class="p-3 border-b border-slate-800 flex justify-between items-center shrink-0 bg-slate-900">
       <div class="flex items-center space-x-2">
         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Pages ({{ workspace.orderedPages.length }})</span>
       </div>
       <div class="flex space-x-2">
-        <button @click="selectAll" class="text-[11px] text-slate-400 hover:text-blue-300 font-medium transition-colors" title="Select All"><CheckSquareIcon class="w-3.5 h-3.5" /></button>
+        <button @click="workspace.processSelected()" :disabled="!workspace.selectedPageIds.size" class="text-[11px] text-emerald-400 hover:text-emerald-300 disabled:opacity-30 font-medium transition-colors flex items-center" title="Process Selected"><CpuIcon class="w-3.5 h-3.5 mr-1" /> Run</button>
+        <div class="w-px h-3 bg-slate-700 self-center"></div>
         <button @click="onAddPagesClick" class="text-[11px] text-blue-400 hover:text-blue-300 font-medium transition-colors flex items-center" title="Insert PDFs"><PlusIcon class="w-3.5 h-3.5 mr-0.5" /> Add</button>
       </div>
     </div>
     
-    <div class="relative flex-1 overflow-y-auto p-3 space-y-3"
+    <!-- Dense Page List -->
+    <div class="relative flex-1 overflow-y-auto p-2 space-y-1 bg-[#0a0c10]"
          @dragover.prevent="onDragOver"
          @dragleave.prevent="onDragLeave"
          @drop.prevent="onDrop">
          
       <div v-for="(page, idx) in workspace.orderedPages" :key="page.id">
-        
-        <!-- Insert Drop Indicator Line -->
-        <div v-if="dropIndicatorIndex === idx" class="h-1 bg-blue-500 rounded my-1 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+        <!-- Drop Indicator -->
+        <div v-if="dropIndicatorIndex === idx" class="h-0.5 bg-blue-500 rounded my-0.5 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
         
         <div 
           draggable="true"
@@ -26,47 +29,42 @@
           @dragstart="onDragStart($event, page.id)"
           @click="onClick(page.id, $event)"
           @contextmenu.prevent="openContextMenu($event, page.id)"
-          class="page-item group relative flex flex-col cursor-pointer rounded-xl p-2 transition-all select-none border"
-          :class="workspace.selectedPageIds.has(page.id) ? 'border-blue-500/50 bg-blue-600/10' : 'border-transparent hover:bg-slate-800/50'"
+          class="page-item group relative flex items-center gap-3 p-2 cursor-pointer rounded-lg border transition-all select-none"
+          :class="workspace.selectedPageIds.has(page.id) ? 'border-blue-500/50 bg-blue-600/10' : 'border-transparent hover:bg-slate-800/60'"
         >
-          <div class="relative w-full aspect-[1/1.4] bg-[#0f1117] rounded-lg overflow-hidden border border-slate-800/80 transition-all shadow-sm group-hover:shadow-md">
-            <img :src="page.image_url" class="w-full h-full object-contain pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity" :style="{ transform: `rotate(${page.rotation}deg)` }" />
-            
-            <div class="absolute top-2 left-2 flex flex-col gap-1.5 z-10 pointer-events-none">
-              <div v-if="page.status === 'approved'" class="w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-sm ring-2 ring-slate-900" title="Approved"></div>
-              <div v-else-if="page.status === 'needs_work'" class="w-2.5 h-2.5 bg-red-500 rounded-full shadow-sm ring-2 ring-slate-900" title="Needs Work"></div>
-              <div v-else class="w-2.5 h-2.5 bg-amber-500 rounded-full shadow-sm ring-2 ring-slate-900" title="Pending Review"></div>
-            </div>
-
-            <div class="absolute bottom-2 right-2 flex space-x-1.5 z-10">
-              <span v-if="page.job_status === 'processing'" class="bg-blue-600 shadow p-1 rounded-full"><LoaderIcon class="w-3 h-3 text-white animate-spin"/></span>
-              <span v-else-if="page.job_status === 'error'" class="bg-red-600 shadow p-1 rounded-full"><AlertCircleIcon class="w-3 h-3 text-white"/></span>
-            </div>
-            
-            <div v-if="page.is_excluded" class="absolute inset-0 bg-slate-950/60 flex items-center justify-center backdrop-blur-sm">
-              <BanIcon class="w-8 h-8 text-red-500/80" />
-            </div>
+          <!-- Drag Handle -->
+          <GripVerticalIcon class="w-4 h-4 text-slate-600 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+          
+          <!-- Mini Thumbnail -->
+          <div class="w-9 h-12 bg-slate-900 border border-slate-700/80 rounded overflow-hidden shrink-0 relative shadow-sm flex items-center justify-center">
+            <img :src="page.image_url" class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" :style="{ transform: `rotate(${page.rotation}deg)` }" />
+            <div v-if="page.is_excluded" class="absolute inset-0 bg-slate-950/70 flex items-center justify-center"><BanIcon class="w-4 h-4 text-red-500/80" /></div>
+            <div v-if="page.job_status === 'processing'" class="absolute inset-0 bg-blue-900/40 flex items-center justify-center"><LoaderIcon class="w-3 h-3 text-white animate-spin"/></div>
+            <div v-if="page.job_status === 'error'" class="absolute inset-0 bg-red-900/60 flex items-center justify-center"><AlertCircleIcon class="w-3 h-3 text-white"/></div>
           </div>
           
-          <div class="mt-2.5 flex flex-col px-1 relative">
-            <div class="absolute top-0 right-0 flex space-x-1">
-               <div v-if="page.is_stale" class="w-1.5 h-1.5 bg-yellow-500 rounded-full" title="Stale"></div>
-               <div v-if="page.is_manual_translation" class="w-1.5 h-1.5 bg-purple-500 rounded-full" title="Edited"></div>
+          <!-- Meta Info -->
+          <div class="flex-1 min-w-0 flex flex-col justify-center">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="text-xs font-semibold text-slate-200">Page {{ page.sort_order }}</span>
+              <!-- Status Dot -->
+              <div class="w-2 h-2 rounded-full shrink-0 shadow-sm" :class="{
+                'bg-emerald-500': page.status === 'approved',
+                'bg-red-500': page.status === 'needs_work',
+                'bg-amber-500': page.status === 'pending_review'
+              }"></div>
             </div>
-            
-            <div class="flex items-baseline space-x-2 mb-0.5">
-              <span class="text-[11px] font-semibold text-slate-300">Page {{ page.sort_order }}</span>
-              <span v-if="page.label" class="text-[10px] text-slate-500 truncate">- {{ page.label }}</span>
+            <div class="flex space-x-1.5 items-center">
+              <span v-if="page.is_stale" class="w-1.5 h-1.5 bg-yellow-500 rounded-full" title="Stale Content"></span>
+              <span v-if="page.is_manual_translation" class="w-1.5 h-1.5 bg-purple-500 rounded-full" title="Edited Content"></span>
+              <span class="text-[10px] text-slate-500 truncate w-full" :title="page.source_filename">{{ page.source_filename }}</span>
             </div>
-            <span class="text-[9px] text-slate-600 truncate w-full" :title="page.source_filename">
-              {{ page.source_filename }}
-            </span>
           </div>
         </div>
       </div>
       
-      <!-- Bottom Insert Indicator Line -->
-      <div v-if="dropIndicatorIndex === workspace.orderedPages.length" class="h-1 bg-blue-500 rounded my-1 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+      <!-- Bottom Drop Indicator -->
+      <div v-if="dropIndicatorIndex === workspace.orderedPages.length" class="h-0.5 bg-blue-500 rounded my-0.5 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
     </div>
 
     <!-- Hidden Input for Page Replacement -->
@@ -77,14 +75,15 @@
       <div v-if="contextMenu.visible" 
            :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }" 
            class="fixed z-[100] bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1.5 w-52 text-[13px] text-slate-200 backdrop-blur-md">
-        <button @click.stop="handleContextAction('process')" class="w-full flex items-center px-4 py-2 hover:bg-blue-600 transition-colors"><CpuIcon class="w-4 h-4 mr-2"/> Process</button>
+        <button @click.stop="handleContextAction('process')" class="w-full flex items-center px-4 py-2 hover:bg-blue-600 transition-colors"><CpuIcon class="w-4 h-4 mr-2"/> Process Again</button>
         <div class="h-px bg-slate-700/50 my-1"></div>
-        <button @click.stop="handleContextAction('replace')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors"><FileIcon class="w-4 h-4 mr-2"/> Replace Page</button>
-        <button @click.stop="handleContextAction('approved')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors text-emerald-400"><CheckCircleIcon class="w-4 h-4 mr-2"/> Approve</button>
-        <button @click.stop="handleContextAction('needs_work')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors text-red-400"><XCircleIcon class="w-4 h-4 mr-2"/> Needs Work</button>
+        <button @click.stop="handleContextAction('replace')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors"><FileIcon class="w-4 h-4 mr-2"/> Replace Source File</button>
         <div class="h-px bg-slate-700/50 my-1"></div>
-        <button @click.stop="handleContextAction('exclude')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors"><BanIcon class="w-4 h-4 mr-2"/> Exclude</button>
-        <button @click.stop="handleContextAction('delete')" class="w-full flex items-center px-4 py-2 hover:bg-red-900/40 transition-colors text-red-400"><TrashIcon class="w-4 h-4 mr-2"/> Delete</button>
+        <button @click.stop="handleContextAction('approved')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors text-emerald-400"><CheckCircleIcon class="w-4 h-4 mr-2"/> Mark Approved</button>
+        <button @click.stop="handleContextAction('needs_work')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors text-red-400"><XCircleIcon class="w-4 h-4 mr-2"/> Mark Needs Work</button>
+        <div class="h-px bg-slate-700/50 my-1"></div>
+        <button @click.stop="handleContextAction('exclude')" class="w-full flex items-center px-4 py-2 hover:bg-slate-700 transition-colors"><BanIcon class="w-4 h-4 mr-2"/> Toggle Exclude</button>
+        <button @click.stop="handleContextAction('delete')" class="w-full flex items-center px-4 py-2 hover:bg-red-900/40 transition-colors text-red-400"><TrashIcon class="w-4 h-4 mr-2"/> Delete Page</button>
       </div>
     </teleport>
   </div>
@@ -92,7 +91,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { LoaderIcon, AlertCircleIcon, PlusIcon, CheckSquareIcon, CheckCircleIcon, XCircleIcon, CpuIcon, BanIcon, TrashIcon, FileIcon } from 'lucide-vue-next';
+import { LoaderIcon, AlertCircleIcon, PlusIcon, GripVerticalIcon, CheckCircleIcon, XCircleIcon, CpuIcon, BanIcon, TrashIcon, FileIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 
 const workspace = useWorkspaceStore();
@@ -113,23 +112,15 @@ const onAddPagesClick = () => {
   input.click();
 };
 
-const onClick = (id, e) => {
-  workspace.selectPage(id, e.metaKey || e.ctrlKey, e.shiftKey);
-};
-
-const selectAll = () => {
-  workspace.orderedPages.forEach(p => workspace.selectedPageIds.add(p.id));
-};
+const onClick = (id, e) => { workspace.selectPage(id, e.metaKey || e.ctrlKey, e.shiftKey); };
 
 const openContextMenu = (e, id) => {
   const menuWidth = 208;
   const menuHeight = 250; 
   let x = e.clientX;
   let y = e.clientY;
-  
   if (x + menuWidth > window.innerWidth) x -= menuWidth;
   if (y + menuHeight > window.innerHeight) y -= menuHeight;
-
   contextMenu.value = { visible: true, x, y, pageId: id };
 };
 
@@ -141,13 +132,8 @@ const handleContextAction = async (action) => {
   const id = contextMenu.value.pageId;
   if (!id) return;
   
-  if (action === 'process') {
-     workspace.selectPage(id);
-     workspace.processSelected();
-  }
-  else if (action === 'replace') {
-     replaceFileInput.value.click();
-  }
+  if (action === 'process') { workspace.selectPage(id); workspace.processSelected(); }
+  else if (action === 'replace') replaceFileInput.value.click();
   else if (action === 'approved' || action === 'needs_work' || action === 'pending_review') {
     await workspace.updatePageInfo(id, { status: action });
   }
@@ -164,9 +150,7 @@ const handleContextAction = async (action) => {
 const onReplaceFile = async (e) => {
   const files = e.target.files;
   const id = contextMenu.value.pageId;
-  if (files.length && id) {
-     await workspace.replacePage(id, files[0]);
-  }
+  if (files.length && id) await workspace.replacePage(id, files[0]);
   e.target.value = null;
 };
 
@@ -180,59 +164,42 @@ const onDragOver = (e) => {
     dropIndicatorIndex.value = 0;
     return;
   }
-  
   const target = e.target.closest('.page-item');
-  if (!target) {
-    dropIndicatorIndex.value = workspace.orderedPages.length;
-    return;
-  }
-  
+  if (!target) { dropIndicatorIndex.value = workspace.orderedPages.length; return; }
   const rect = target.getBoundingClientRect();
   const midY = rect.top + rect.height / 2;
   const idx = parseInt(target.dataset.index, 10);
-  
   if (e.clientY < midY) dropIndicatorIndex.value = idx;
   else dropIndicatorIndex.value = idx + 1;
 };
 
-const onDragLeave = (e) => {
-  if (!e.currentTarget.contains(e.relatedTarget)) {
-    dropIndicatorIndex.value = null;
-  }
-};
+const onDragLeave = (e) => { if (!e.currentTarget.contains(e.relatedTarget)) dropIndicatorIndex.value = null; };
 
 const onDrop = async (e) => {
   const insertIndex = dropIndicatorIndex.value;
   dropIndicatorIndex.value = null;
-  
   if (insertIndex === null) return;
   
   const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type === 'application/pdf');
   
-  // External File Insertion via drag-and-drop
   if (files.length > 0) {
     let insertAfterId = null;
-    if (insertIndex === 0) {
-      insertAfterId = 'START';
-    } else if (insertIndex <= workspace.orderedPages.length) {
-      insertAfterId = workspace.orderedPages[insertIndex - 1].id;
-    }
+    if (insertIndex === 0) insertAfterId = 'START';
+    else if (insertIndex <= workspace.orderedPages.length) insertAfterId = workspace.orderedPages[insertIndex - 1].id;
     await workspace.insertFiles(files, insertAfterId);
     return;
   }
   
-  // Internal Page Reordering
   if (draggedId.value) {
     const list = [...workspace.orderedPages];
     const fromIdx = list.findIndex(p => p.id === draggedId.value);
     if (fromIdx === -1) return;
     
     let toIdx = insertIndex;
-    if (fromIdx < toIdx) toIdx--; // adjust for item removal
+    if (fromIdx < toIdx) toIdx--; 
     
     const [moved] = list.splice(fromIdx, 1);
     list.splice(toIdx, 0, moved);
-    
     await workspace.updatePageOrder(list.map(p => p.id));
     draggedId.value = null;
   }
