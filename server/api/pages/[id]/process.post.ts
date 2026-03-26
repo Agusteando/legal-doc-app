@@ -84,12 +84,12 @@ const schema = {
 const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks prioritizing absolute structural and vertical fidelity.
 
 CRITICAL HARD REQUIREMENTS:
-1. VERTICAL RHYTHM & SPACING: Treat spacing as first-class layout data. Accurately capture blank-line separation and vertical gaps between distinct sections using \`spacing_before\` and \`spacing_after\` (none, small, medium, large, xlarge). Do NOT collapse disconnected paragraphs into single blocks.
-2. TYPOGRAPHIC HIERARCHY: Identify headers, titles, and body text explicitly using \`font_size\` (small, normal, large, xlarge) and \`font_weight\` (normal, bold). 
-3. INDENTATION & ALIGNMENT: Capture explicit nested clauses, pushed-in blocks, or offset text using \`indentation\` (none, small, medium, large) and \`alignment\`.
-4. LABELS VS VALUES: For distinct key-value pairs or structured fields, strictly use the \`form_field\` type with separate \`form_label\` and \`form_value\`.
+1. PURE TEXT, NO ARTIFACTS: NEVER leak JSON syntax (like \`},{\` or \`"]\`) into the actual text strings. Content must be pure human-readable legal text. Do not duplicate colons in form labels.
+2. VERTICAL RHYTHM & SPACING: Treat spacing as first-class layout data. Accurately capture blank-line separation and vertical gaps between distinct sections using \`spacing_before\` and \`spacing_after\`. Do NOT collapse disconnected paragraphs.
+3. ALIGNMENT & JUSTIFICATION: Standard legal body paragraphs MUST use \`justify\` alignment. Only use \`center\`, \`left\`, or \`right\` when explicitly formatted that way visually.
+4. TYPOGRAPHIC HIERARCHY: Identify headers, titles, and body text explicitly using \`font_size\` and \`font_weight\`.
 5. TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings to mirror physical document line wrapping exactly.
-6. NO DECORATIONS: Do not invent fake separators or aesthetics. Never use placeholders like 'signature here'. Extract legible text ONLY. Exact professional reproduction is the goal.`;
+6. NO DECORATIONS: Do not invent fake separators or aesthetics. Extract legible text ONLY. Exact professional reproduction is the goal.`;
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
         {
           role: "user",
           content:[
-            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks prioritizing absolute structural spacing and hierarchy fidelity." },
+            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks. Ensure strict cleanliness of strings with zero JSON artifacts leaked into the content." },
             { type: "image_url", image_url: { url: base64ImageUrl } }
           ]
         }
