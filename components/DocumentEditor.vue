@@ -41,14 +41,14 @@
       <button @mousedown.prevent="exec('removeFormat')" class="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors" title="Clear Formatting"><EraserIcon class="w-4 h-4" /></button>
     </div>
     
-    <!-- Virtual Paper Canvas (Tamaño Oficio: 8.5 x 13 inches) -->
+    <!-- Virtual Paper Canvas (Tamaño Oficio: 8.5 x 13 inches) with visual 1in padding mimicking print margins -->
     <div class="flex-1 overflow-auto py-8 px-4 flex justify-center custom-scrollbar relative">
       <div 
         ref="editorRef"
         contenteditable="true" 
         @input="onInput"
         class="bg-white shadow-xl ring-1 ring-slate-900/10 w-[8.5in] min-h-[13in] max-w-full p-[1in] text-black focus:outline-none transition-shadow hover:shadow-2xl"
-        style="box-sizing: border-box;">
+        style="box-sizing: border-box; font-family: 'Times New Roman', Times, serif;">
       </div>
     </div>
   </div>
@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue';
 import { BoldIcon, ItalicIcon, UnderlineIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, ListIcon, EraserIcon, LoaderIcon, CheckCircleIcon, RefreshCwIcon, LinkIcon, ChevronLeftIcon, ChevronRightIcon, FileSignatureIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import { renderLayoutBlock } from '~/utils/renderer';
@@ -91,8 +91,9 @@ const getCompiledHtml = (p) => {
     if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
       data.layout_blocks.forEach(block => { html += renderLayoutBlock(block); });
     } else { 
-      html = `<p style="font-family:'Times New Roman', Times, serif; font-size:11pt;">${data.translated_text || ''}</p>`; 
+      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; color: #000;">${data.translated_text || ''}</div>`; 
     }
+    // Allow pure styling to persist securely through DOMPurify
     return DOMPurify.sanitize(html, { ADD_ATTR: ['style'] });
   } catch (e) {
     return `<div style="color: #b91c1c; font-family: sans-serif; font-size: 10pt;">Layout parsing error. JSON is invalid.</div>`;
@@ -106,7 +107,7 @@ watch(() => page.value, async (newPage) => {
     if (newPage.manual_html_override) {
       editorRef.value.innerHTML = newPage.manual_html_override;
     } else {
-      editorRef.value.innerHTML = getCompiledHtml(newPage) || '<p style="color:#94a3b8; font-style:italic; text-align:center;">Awaiting page compilation data...</p>';
+      editorRef.value.innerHTML = getCompiledHtml(newPage) || '<div style="color:#94a3b8; font-style:italic; text-align:center;">Awaiting page compilation data...</div>';
     }
   }
 }, { immediate: true });
@@ -116,7 +117,7 @@ const resetToAuto = async () => {
   if (!confirm("This will erase any manual formatting edits for this page and strictly re-assemble it from the underlying JSON data. Continue?")) return;
   await workspace.savePageHtml(page.value.id, null);
   if (editorRef.value) {
-    editorRef.value.innerHTML = getCompiledHtml(page.value) || '<p style="color:#94a3b8; font-style:italic;">Awaiting page data...</p>';
+    editorRef.value.innerHTML = getCompiledHtml(page.value) || '<div style="color:#94a3b8; font-style:italic;">Awaiting page data...</div>';
   }
 };
 

@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
           if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
             data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
           } else {
-             innerHtml += `<p style="font-family:'Times New Roman', Times, serif; font-size:11pt;">${data.translated_text || ''}</p>`;
+             innerHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt;">${data.translated_text || ''}</div>`;
           }
         } catch (e) {
           console.error(`[Export] Failed to parse JSON for page ${page.id}`);
@@ -46,8 +46,8 @@ export default defineEventHandler(async (event) => {
       <head>
         <meta charset="UTF-8">
         <style>
-          /* Strict Print Styling - Tamaño Oficio (8.5 x 13 inches) */
-          @page { size: 8.5in 13in; margin: 0; }
+          /* Strict Print Styling - Legal Base Profile */
+          @page { size: 8.5in 13in; margin: 1in; }
           body { 
             margin: 0; 
             padding: 0; 
@@ -56,9 +56,7 @@ export default defineEventHandler(async (event) => {
             print-color-adjust: exact;
           }
           .page-container { 
-            width: 8.5in; 
-            height: 13in; 
-            padding: 1in; 
+            width: 100%; 
             box-sizing: border-box; 
             overflow: hidden; 
             page-break-after: always;

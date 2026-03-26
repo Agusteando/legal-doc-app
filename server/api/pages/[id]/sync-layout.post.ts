@@ -38,7 +38,6 @@ export default defineEventHandler(async (event) => {
   await db.query(`UPDATE pages SET job_status = 'processing' WHERE id = ?`, [id]);
 
   try {
-    // Upgraded to gpt-5.4 with moderate reasoning allocation
     const response = await openai.chat.completions.create({
       model: "gpt-5.4",
       reasoning_effort: "medium",
@@ -46,7 +45,7 @@ export default defineEventHandler(async (event) => {
       messages:[
         { 
           role: "system", 
-          content: "You are a layout packager. Take the provided manually edited translation text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content, just break it into structural blocks (paragraphs, lists, headings) based on line breaks and context." 
+          content: "You are a layout packager. Take the provided manually edited translation text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Preserve line breaks exactly using \\n. Assign realistic structural blocks ensuring professional and exact document fidelity." 
         },
         { role: "user", content: `Repackage this text into layout blocks:\n\n${body.translated_text}` }
       ],
@@ -55,7 +54,6 @@ export default defineEventHandler(async (event) => {
 
     const parsed = JSON.parse(response.choices[0].message.content || '{}');
     
-    // Merge new blocks into existing JSON so we don't destroy confidence_scores
     const [existing]: any = await db.query(`SELECT extracted_json FROM pages WHERE id = ?`, [id]);
     let currentData = { source_text: body.source_text, translated_text: body.translated_text, confidence_score: 1, needs_review: false, layout_blocks: [] };
     if (existing.length && existing[0].extracted_json) {

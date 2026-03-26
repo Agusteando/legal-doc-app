@@ -19,7 +19,8 @@ export default defineEventHandler(async (event) => {
     if (page.extracted_json) {
       try {
         const data = JSON.parse(page.extracted_json);
-        computedHtml += `<div class="page-container" style="width: 8.5in; height: 11in; padding: 1in; box-sizing: border-box; overflow: hidden; page-break-after: always; position: relative;">\n`;
+        // Container relies strictly on 100% width matching the rigorous PDF margins. Bottom margin mimics standard previewing breaks.
+        computedHtml += `<div class="page-container" style="width: 100%; box-sizing: border-box; overflow: hidden; page-break-after: always; position: relative; margin-bottom: 2rem;">\n`;
         if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
           data.layout_blocks.forEach((block: any) => computedHtml += renderLayoutBlock(block));
         }
@@ -32,7 +33,7 @@ export default defineEventHandler(async (event) => {
 
   return { 
     is_override: false,
-    html: computedHtml || '<p style="color:#94a3b8; font-style:italic; text-align:center; padding-top: 2rem;">No extracted page data found yet. Process pages to begin document assembly.</p>',
+    html: computedHtml || '<div style="color:#94a3b8; font-style:italic; text-align:center; padding-top: 2rem;">No extracted page data found yet. Process pages to begin document assembly.</div>',
     computed_html: computedHtml
   };
 });

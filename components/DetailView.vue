@@ -28,8 +28,14 @@
         </div>
       </div>
 
-      <!-- Main Validation Image: Amazon-Style Zoom -->
-      <div class="flex-1 relative overflow-hidden flex items-center justify-center p-6 pb-16 z-0">
+      <!-- Main Validation Image: Amazon-Style Zoom Container -->
+      <div 
+        ref="zoomContainer"
+        class="flex-1 relative overflow-hidden flex items-center justify-center p-6 pb-16 z-0 bg-[#050608] cursor-crosshair"
+        @mouseenter="isZoomed = true"
+        @mouseleave="isZoomed = false; transformOrigin = '50% 50%'"
+        @mousemove="onMouseMove"
+      >
         <!-- Progressive Loader -->
         <div v-if="imageLoading" class="absolute inset-0 flex items-center justify-center pointer-events-none">
           <LoaderIcon class="w-6 h-6 text-slate-600 animate-spin" />
@@ -40,15 +46,11 @@
         </div>
 
         <img 
-          ref="imageContainer"
           :src="page.image_url" 
           @load="imageLoading = false"
-          @mouseenter="isZoomed = true"
-          @mouseleave="isZoomed = false; transformOrigin = '50% 50%'"
-          @mousemove="onMouseMove"
-          class="block max-w-full max-h-full object-contain cursor-crosshair shadow-2xl transition-transform duration-100 ease-out will-change-transform"
-          :class="imageLoading ? 'opacity-0' : 'opacity-100'"
-          :style="{ transform: `rotate(${page.rotation}deg) scale(${isZoomed ? 2.5 : 1})`, transformOrigin }"
+          class="block w-full h-full object-contain shadow-2xl will-change-transform pointer-events-none transition-transform"
+          :class="[imageLoading ? 'opacity-0' : 'opacity-100', isZoomed ? 'ease-linear duration-[50ms]' : 'ease-out duration-300']"
+          :style="{ transform: `rotate(${page.rotation}deg) scale(${isZoomed ? 3 : 1})`, transformOrigin }"
           draggable="false"
         />
       </div>
@@ -92,9 +94,9 @@ import { useWorkspaceStore } from '~/stores/workspace';
 
 const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
-const imageContainer = ref(null);
+const zoomContainer = ref(null);
 
-// Amazon-Style Hover Zoom State
+// Jitter-free Amazon-Style Hover Zoom State
 const imageLoading = ref(true);
 const isZoomed = ref(false);
 const transformOrigin = ref('50% 50%');
@@ -134,11 +136,11 @@ const toggleTab = (tabName) => {
   activeTab.value = activeTab.value === tabName ? null : tabName;
 };
 
-// Frictionless Zoom Math (Accounts for DOM Rotation)
+// Math uses the static unscaled bounding container for absolute jitter-free panning
 const onMouseMove = (e) => {
-  if (!isZoomed.value || !imageContainer.value || !page.value) return;
+  if (!isZoomed.value || !zoomContainer.value || !page.value) return;
   
-  const rect = imageContainer.value.getBoundingClientRect();
+  const rect = zoomContainer.value.getBoundingClientRect();
   const xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
   const yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
 

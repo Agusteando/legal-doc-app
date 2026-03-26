@@ -59,11 +59,12 @@ const schema = {
 const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks. You are an expert at parsing complex Latin American legal layouts. Break the document down granularly.
 
 CRITICAL HARD REQUIREMENTS:
-1. NEVER invent placeholders like 'Signature here' or 'Circular stamp with text'. 
-2. If a signature, stamp, or seal contains LEGIBLE names/text, extract ONLY the legible text. If it is illegible or generic, DO NOT document it at all. Never include descriptions of artifacts.
-3. Reproduce the layout accurately. If the document uses a multi-column layout or grid formatting, use the 'table' block to represent the structural alignment (leave headers empty if there are none).
-4. Respect text formatting (<b>, <i>, <u>). Use <big> or <small> for drastic size changes.
-5. Identify dividers, precise alignments, and form field rows carefully.`;
+1. PRESERVE LEGAL FIDELITY: Paragraphs, true line breaks, headers, font size hierarchy, and overall text density MUST be reconstructed exactly as they appear visually. Use explicit \\n characters for literal line breaks within text strings.
+2. NEVER invent placeholders like 'Signature here' or 'Circular stamp with text'. Extract legible text ONLY. If it is illegible, do NOT extract or describe it.
+3. Do NOT invent decorative separators or aesthetic borders.
+4. Reproduce the layout accurately. Use 'table' strictly for tabular data or multi-column structural alignment.
+5. Respect text formatting (<b>, <i>, <u>). Use <big> or <small> for drastic size changes.
+6. Remember: The ultimate goal is an exact professional reproduction, not beautification.`;
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
@@ -87,7 +88,7 @@ export default defineEventHandler(async (event) => {
     const mimeType = imageResponse.headers.get('content-type') || 'image/png';
     const base64ImageUrl = `data:${mimeType};base64,${base64String}`;
 
-    // Upgraded to gpt-5.4 with moderate reasoning allocation
+    // Kept gpt-5.4 exact specification as mandated
     const response = await openai.chat.completions.create({
       model: "gpt-5.4",
       reasoning_effort: "medium",
@@ -97,7 +98,7 @@ export default defineEventHandler(async (event) => {
         {
           role: "user",
           content:[
-            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks." },
+            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks prioritizing line break and font-size fidelity." },
             { type: "image_url", image_url: { url: base64ImageUrl } }
           ]
         }
@@ -112,7 +113,6 @@ export default defineEventHandler(async (event) => {
     const parsed = JSON.parse(jsonStr);
     const duration = Math.round((Date.now() - start) / 1000);
 
-    // Keep status as 'pending_review' since human approval is required.
     await db.query(`
       UPDATE pages 
       SET job_status = 'completed', job_duration_sec = ?, 
