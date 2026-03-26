@@ -41,13 +41,13 @@
       <button @mousedown.prevent="exec('removeFormat')" class="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors" title="Clear Formatting"><EraserIcon class="w-4 h-4" /></button>
     </div>
     
-    <!-- Virtual Paper Canvas (Legal Size: 8.5x14) -->
+    <!-- Virtual Paper Canvas (Tamaño Oficio: 8.5 x 13 inches) -->
     <div class="flex-1 overflow-auto py-8 px-4 flex justify-center custom-scrollbar relative">
       <div 
         ref="editorRef"
         contenteditable="true" 
         @input="onInput"
-        class="bg-white shadow-xl ring-1 ring-slate-900/10 w-[8.5in] min-h-[14in] max-w-full p-[1in] text-black focus:outline-none transition-shadow hover:shadow-2xl"
+        class="bg-white shadow-xl ring-1 ring-slate-900/10 w-[8.5in] min-h-[13in] max-w-full p-[1in] text-black focus:outline-none transition-shadow hover:shadow-2xl"
         style="box-sizing: border-box;">
       </div>
     </div>
@@ -83,7 +83,6 @@ onUnmounted(() => {
   if (saveTimeout) clearTimeout(saveTimeout);
 });
 
-// Calculate the deterministic HTML representation of the page
 const getCompiledHtml = (p) => {
   if (!p || !p.extracted_json) return '';
   try {
@@ -100,7 +99,6 @@ const getCompiledHtml = (p) => {
   }
 };
 
-// Sync the DOM when the active page changes
 watch(() => page.value, async (newPage) => {
   if (!newPage) return;
   await nextTick();

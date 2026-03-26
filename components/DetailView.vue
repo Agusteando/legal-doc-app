@@ -1,33 +1,26 @@
 <template>
-  <div class="h-full flex flex-col bg-[#0a0c10] text-slate-200 relative">
+  <div class="h-full flex flex-col bg-[#050608] border-r border-slate-800 text-slate-200 relative">
     
     <template v-if="page">
-      <!-- Toolbar Header -->
-      <div class="h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-[#0f1117] shrink-0 z-10 shadow-sm">
+      <!-- Minimal Header -->
+      <div class="h-14 border-b border-slate-800/80 flex items-center justify-between px-4 bg-[#0a0c10] shrink-0 z-10 shadow-sm">
         <div class="flex items-center space-x-3">
-          <!-- Expand/Collapse Toggle -->
-          <button @click="workspace.isPanelExpanded = !workspace.isPanelExpanded" class="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700" :title="workspace.isPanelExpanded ? 'Collapse Validation Panel' : 'Expand Validation Panel'">
-            <Minimize2Icon v-if="workspace.isPanelExpanded" class="w-4 h-4" />
-            <Maximize2Icon v-else class="w-4 h-4" />
-          </button>
-          
-          <div class="w-px h-5 bg-slate-800"></div>
-          
-          <span class="text-xs font-bold text-slate-400 whitespace-nowrap">Page {{ page.sort_order }}</span>
+          <span class="text-xs font-bold tracking-widest text-slate-400 whitespace-nowrap uppercase">Page {{ page.sort_order }}</span>
+          <div class="w-px h-4 bg-slate-800"></div>
           
           <div class="flex space-x-1">
-            <button @click="rotate" class="p-1.5 rounded hover:bg-slate-800 text-slate-400 transition-colors" title="Rotate Image">
+            <button @click="rotate" class="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors" title="Rotate Image">
               <RotateCwIcon class="w-3.5 h-3.5" />
             </button>
-            <button @click="toggleExclude" class="p-1.5 rounded hover:bg-slate-800 transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/20' : 'text-slate-400'" title="Exclude from Export">
+            <button @click="toggleExclude" class="p-1.5 rounded hover:bg-slate-800 transition-colors" :class="page.is_excluded ? 'text-red-400 bg-red-900/20' : 'text-slate-400 hover:text-white'" title="Exclude from Export">
               <BanIcon class="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
         
-        <div class="flex items-center bg-slate-950 border border-slate-800 rounded-md px-2.5 py-1 shadow-inner max-w-[140px]">
+        <div class="flex items-center bg-slate-900 border border-slate-800 rounded px-2 py-1 shadow-inner max-w-[130px]">
           <div class="w-1.5 h-1.5 rounded-full mr-2 shrink-0" :class="{'bg-emerald-500': localStatus === 'approved', 'bg-red-500': localStatus === 'needs_work', 'bg-amber-500': localStatus === 'pending_review'}"></div>
-          <select v-model="localStatus" @change="saveMetadata" class="bg-transparent border-none text-[11px] font-semibold cursor-pointer outline-none appearance-none pr-4 w-full truncate focus:ring-0" :class="{'text-emerald-400': localStatus === 'approved', 'text-red-400': localStatus === 'needs_work', 'text-amber-400': localStatus === 'pending_review'}">
+          <select v-model="localStatus" @change="saveMetadata" class="bg-transparent border-none text-[10px] font-bold uppercase tracking-wider cursor-pointer outline-none appearance-none pr-4 w-full truncate focus:ring-0" :class="{'text-emerald-400': localStatus === 'approved', 'text-red-400': localStatus === 'needs_work', 'text-amber-400': localStatus === 'pending_review'}">
             <option value="pending_review" class="bg-slate-900 text-amber-400">Pending</option>
             <option value="approved" class="bg-slate-900 text-emerald-400">Approved</option>
             <option value="needs_work" class="bg-slate-900 text-red-400">Needs Work</option>
@@ -35,107 +28,85 @@
         </div>
       </div>
 
-      <!-- Top Half: Performant Pan & Zoom Image Viewer -->
-      <div ref="containerRef" class="flex-1 relative bg-[#050608] border-b border-slate-800 overflow-hidden cursor-grab active:cursor-grabbing group flex items-center justify-center"
-           @wheel.prevent="handleWheel" @mousedown="startPan" @mousemove="doPan" @mouseup="endPan" @mouseleave="endPan">
-        
-        <!-- Image Container for Origin Math -->
-        <img 
-          :src="displayUrl" 
-          @load="imageLoading = false"
-          loading="eager"
-          decoding="async"
-          class="max-w-full max-h-full object-contain pointer-events-none will-change-transform shadow-2xl transition-opacity duration-300"
-          style="transform-origin: center;"
-          :class="imageLoading ? 'opacity-0' : 'opacity-100'"
-          :style="{ transform: `translate(${panX}px, ${panY}px) scale(${zoomScale}) rotate(${page.rotation}deg)` }"
-          draggable="false"
-        />
-
-        <!-- Progressive State -->
-        <div v-if="imageLoading" class="absolute inset-0 pointer-events-none flex items-center justify-center bg-slate-950/50 z-10 backdrop-blur-sm transition-opacity duration-300">
-          <LoaderIcon class="w-8 h-8 text-blue-500 animate-spin" />
+      <!-- Main Validation Image: Amazon-Style Zoom -->
+      <div class="flex-1 relative overflow-hidden flex items-center justify-center p-6 pb-16 z-0">
+        <!-- Progressive Loader -->
+        <div v-if="imageLoading" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <LoaderIcon class="w-6 h-6 text-slate-600 animate-spin" />
         </div>
         
-        <!-- Excluded Warning -->
         <div v-if="page.is_excluded" class="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px]">
           <span class="text-xs font-bold tracking-widest bg-red-600/90 text-white px-3 py-1.5 rounded shadow-lg border border-red-500">EXCLUDED</span>
         </div>
 
-        <!-- HD Toggle Overlay -->
-        <div class="absolute top-3 left-3 z-30 flex space-x-2">
-          <button @click.stop="isHdMode = !isHdMode; imageLoading = true" class="px-2.5 py-1.5 rounded text-[10px] font-bold tracking-widest uppercase shadow-lg transition-colors border"
-                  :class="isHdMode ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white backdrop-blur'">
-            {{ isHdMode ? 'HD View Active' : 'Load HD View' }}
-          </button>
-        </div>
-
-        <!-- Zoom Controls Overlay -->
-        <div class="absolute bottom-3 right-3 z-30 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-lg p-1 shadow-lg flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button @click.stop="zoomOut" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"><ZoomOutIcon class="w-3.5 h-3.5"/></button>
-          <button @click.stop="resetZoom" class="px-2 text-slate-300 hover:text-white font-mono text-[10px] min-w-[3rem] text-center" title="Reset View">{{ Math.round(zoomScale * 100) }}%</button>
-          <button @click.stop="zoomIn" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"><ZoomInIcon class="w-3.5 h-3.5"/></button>
-        </div>
+        <img 
+          ref="imageContainer"
+          :src="page.image_url" 
+          @load="imageLoading = false"
+          @mouseenter="isZoomed = true"
+          @mouseleave="isZoomed = false; transformOrigin = '50% 50%'"
+          @mousemove="onMouseMove"
+          class="block max-w-full max-h-full object-contain cursor-crosshair shadow-2xl transition-transform duration-100 ease-out will-change-transform"
+          :class="imageLoading ? 'opacity-0' : 'opacity-100'"
+          :style="{ transform: `rotate(${page.rotation}deg) scale(${isZoomed ? 2.5 : 1})`, transformOrigin }"
+          draggable="false"
+        />
       </div>
 
-      <!-- Bottom Half: Data Tabs (45% Height) -->
-      <div class="h-[45%] flex flex-col bg-[#0e1116] shrink-0 relative">
-        <div class="flex items-center justify-between px-2 h-10 border-b border-slate-800 bg-slate-900/50 shrink-0 overflow-x-auto custom-scrollbar">
-          <div class="flex space-x-1">
-            <button @click="activeTab = 'es'" class="px-3 h-10 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2" :class="activeTab === 'es' ? 'text-blue-400 border-blue-500' : 'text-slate-500 border-transparent hover:text-slate-300'">Spanish OCR <span v-if="dirtyFlags.source" class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full ml-1"></span></button>
-            <button @click="activeTab = 'en'" class="px-3 h-10 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2" :class="activeTab === 'en' ? 'text-emerald-400 border-emerald-500' : 'text-slate-500 border-transparent hover:text-slate-300'">Raw English <span v-if="dirtyFlags.translated" class="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full ml-1"></span></button>
-            <button @click="activeTab = 'json'" class="px-3 h-10 text-[10px] font-bold uppercase tracking-wider transition-colors border-b-2" :class="activeTab === 'json' ? 'text-purple-400 border-purple-500' : 'text-slate-500 border-transparent hover:text-slate-300'">JSON Data <span v-if="dirtyFlags.json" class="inline-block w-1.5 h-1.5 bg-purple-500 rounded-full ml-1"></span></button>
-          </div>
+      <!-- Floating Data Inspector Drawer -->
+      <div class="absolute bottom-0 left-0 right-0 bg-[#0f1117]/95 backdrop-blur-md border-t border-slate-800 transition-all duration-300 ease-in-out flex flex-col z-30 shadow-[0_-20px_40px_rgba(0,0,0,0.4)]"
+           :class="activeTab ? 'h-[45%]' : 'h-11'">
+        
+        <!-- Drawer Header Tabs -->
+        <div class="h-11 flex items-center px-4 space-x-3 border-b border-transparent shrink-0" :class="{'border-slate-800': activeTab}">
+          <button @click="toggleTab('es')" class="text-[10px] font-bold uppercase tracking-wider transition-colors hover:text-slate-300 flex items-center" :class="activeTab === 'es' ? 'text-blue-400' : 'text-slate-500'">Spanish OCR <span v-if="dirtyFlags.source" class="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full ml-1.5 shadow"></span></button>
+          <button @click="toggleTab('en')" class="text-[10px] font-bold uppercase tracking-wider transition-colors hover:text-slate-300 flex items-center" :class="activeTab === 'en' ? 'text-emerald-400' : 'text-slate-500'">Raw English <span v-if="dirtyFlags.translated" class="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full ml-1.5 shadow"></span></button>
+          <button @click="toggleTab('json')" class="text-[10px] font-bold uppercase tracking-wider transition-colors hover:text-slate-300 flex items-center" :class="activeTab === 'json' ? 'text-purple-400' : 'text-slate-500'">JSON Data <span v-if="dirtyFlags.json" class="inline-block w-1.5 h-1.5 bg-purple-500 rounded-full ml-1.5 shadow"></span></button>
           
-          <button @click="saveReview" :disabled="!isDirty" class="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all shadow shrink-0 ml-4 disabled:opacity-0 disabled:pointer-events-none" :class="isDirty ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-transparent'">Sync Edits</button>
+          <div class="flex-1"></div>
+          
+          <button v-if="activeTab" @click="saveReview" :disabled="!isDirty" class="px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-0 disabled:pointer-events-none" :class="isDirty ? 'bg-blue-600 text-white hover:bg-blue-500 shadow' : 'bg-transparent text-transparent'">Sync Edits</button>
+          <button v-if="activeTab" @click="activeTab = null" class="ml-2 p-1 text-slate-500 hover:text-white transition-colors" title="Close Panel"><ChevronDownIcon class="w-4 h-4" /></button>
         </div>
 
-        <textarea v-show="activeTab === 'es'" v-model="localSource" class="w-full flex-1 bg-transparent text-slate-400 font-mono text-[12px] leading-relaxed p-4 border-none focus:ring-0 resize-none outline-none custom-scrollbar"></textarea>
-        <textarea v-show="activeTab === 'en'" v-model="localTranslation" class="w-full flex-1 bg-transparent text-emerald-400 font-mono text-[12px] leading-relaxed p-4 border-none focus:ring-0 resize-none outline-none custom-scrollbar"></textarea>
-        <textarea v-show="activeTab === 'json'" v-model="localJson" @blur="saveJson" class="w-full flex-1 bg-transparent text-purple-400 font-mono text-[11px] leading-relaxed p-4 border-none focus:ring-0 resize-none outline-none custom-scrollbar"></textarea>
+        <!-- Drawer Content -->
+        <div v-show="activeTab" class="flex-1 relative p-4 flex flex-col bg-[#0a0c10] overflow-hidden">
+          <textarea v-show="activeTab === 'es'" v-model="localSource" class="w-full flex-1 bg-transparent text-slate-400 font-mono text-[12px] leading-relaxed border-none focus:ring-0 resize-none outline-none custom-scrollbar"></textarea>
+          <textarea v-show="activeTab === 'en'" v-model="localTranslation" class="w-full flex-1 bg-transparent text-emerald-400 font-mono text-[12px] leading-relaxed border-none focus:ring-0 resize-none outline-none custom-scrollbar"></textarea>
+          <textarea v-show="activeTab === 'json'" v-model="localJson" @blur="saveJson" class="w-full flex-1 bg-transparent text-purple-400 font-mono text-[11px] leading-relaxed border-none focus:ring-0 resize-none outline-none custom-scrollbar"></textarea>
+        </div>
       </div>
     </template>
     
-    <div v-else class="h-full flex flex-col items-center justify-center text-slate-500">
-      <div class="bg-slate-900/50 p-6 rounded-full mb-4 border border-slate-800 shadow-inner"><LayoutIcon class="w-8 h-8 text-slate-600" /></div>
-      <p class="text-sm font-medium">Select a page to inspect.</p>
+    <div v-else class="h-full flex flex-col items-center justify-center text-slate-600 bg-[#050608]">
+      <div class="bg-slate-900/30 p-5 rounded-full mb-3 border border-slate-800 shadow-inner"><LayoutIcon class="w-6 h-6" /></div>
+      <p class="text-xs font-semibold uppercase tracking-widest">Select a page to inspect</p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, reactive } from 'vue';
-import { BanIcon, RotateCwIcon, ZoomInIcon, ZoomOutIcon, LoaderIcon, LayoutIcon, Maximize2Icon, Minimize2Icon } from 'lucide-vue-next';
+import { BanIcon, RotateCwIcon, LoaderIcon, LayoutIcon, ChevronDownIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 
 const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
-const containerRef = ref(null);
+const imageContainer = ref(null);
 
-// Text & Validation State
-const activeTab = ref('es');
+// Amazon-Style Hover Zoom State
+const imageLoading = ref(true);
+const isZoomed = ref(false);
+const transformOrigin = ref('50% 50%');
+
+// Text Drawer State
+const activeTab = ref(null);
 const localSource = ref('');
 const localTranslation = ref('');
 const localJson = ref('');
 const localStatus = ref('pending_review');
 const dirtyFlags = reactive({ source: false, translated: false, json: false });
 const isDirty = computed(() => dirtyFlags.source || dirtyFlags.translated);
-
-// Pan, Zoom & HD State
-const imageLoading = ref(true);
-const isHdMode = ref(false);
-const zoomScale = ref(1);
-const panX = ref(0);
-const panY = ref(0);
-const isDragging = ref(false);
-let startX = 0;
-let startY = 0;
-
-const displayUrl = computed(() => {
-  if (!page.value) return '';
-  // Load HD if manually toggled, otherwise load standard fast preview (falling back to image_url for legacy rows)
-  return isHdMode.value ? page.value.image_url : (page.value.thumbnail_url || page.value.image_url);
-});
 
 watch(() => page.value, (p) => {
   if (p) {
@@ -146,11 +117,7 @@ watch(() => page.value, (p) => {
     dirtyFlags.source = false;
     dirtyFlags.translated = false;
     dirtyFlags.json = false;
-    
-    // Reset Engine
-    isHdMode.value = false;
     imageLoading.value = true;
-    resetZoom();
   }
 }, { immediate: true, deep: true });
 
@@ -163,43 +130,29 @@ watch(localJson, (val) => {
   }
 });
 
-// Cursor-Anchored Center Math
-const handleWheel = (e) => {
-  if (!containerRef.value) return;
-  const zoomSensitivity = 0.002;
-  const delta = -e.deltaY * zoomSensitivity;
-  const newZoom = Math.min(Math.max(0.1, zoomScale.value + delta), 8);
-
-  const rect = containerRef.value.getBoundingClientRect();
-  const centerX = rect.width / 2;
-  const centerY = rect.height / 2;
-  const mouseX = e.clientX - rect.left - centerX;
-  const mouseY = e.clientY - rect.top - centerY;
-
-  const scaleRatio = newZoom / zoomScale.value;
-  panX.value = mouseX - (mouseX - panX.value) * scaleRatio;
-  panY.value = mouseY - (mouseY - panY.value) * scaleRatio;
-  zoomScale.value = newZoom;
+const toggleTab = (tabName) => {
+  activeTab.value = activeTab.value === tabName ? null : tabName;
 };
 
-const startPan = (e) => {
-  isDragging.value = true;
-  startX = e.clientX - panX.value;
-  startY = e.clientY - panY.value;
+// Frictionless Zoom Math (Accounts for DOM Rotation)
+const onMouseMove = (e) => {
+  if (!isZoomed.value || !imageContainer.value || !page.value) return;
+  
+  const rect = imageContainer.value.getBoundingClientRect();
+  const xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+  const yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+
+  let originX = xPct;
+  let originY = yPct;
+  const rot = page.value.rotation % 360;
+
+  if (rot === 90) { originX = yPct; originY = 100 - xPct; }
+  else if (rot === 180) { originX = 100 - xPct; originY = 100 - yPct; }
+  else if (rot === 270) { originX = 100 - yPct; originY = xPct; }
+
+  transformOrigin.value = `${originX}% ${originY}%`;
 };
 
-const doPan = (e) => {
-  if (!isDragging.value) return;
-  panX.value = e.clientX - startX;
-  panY.value = e.clientY - startY;
-};
-
-const endPan = () => { isDragging.value = false; };
-const zoomIn = () => { zoomScale.value = Math.min(8, zoomScale.value + 0.25); };
-const zoomOut = () => { zoomScale.value = Math.max(0.1, zoomScale.value - 0.25); };
-const resetZoom = () => { zoomScale.value = 1; panX.value = 0; panY.value = 0; };
-
-// Metadata & Sync Handlers
 const saveMetadata = async () => {
   if (!page.value) return;
   await workspace.updatePageInfo(page.value.id, { status: localStatus.value });

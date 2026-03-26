@@ -5,7 +5,6 @@ export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
   const db = getDb();
   
-  // 1. Strictly read token directly from the environment variable
   const token = process.env.RENDER_SERVICE_TOKEN || '';
 
   try {
@@ -15,7 +14,6 @@ export default defineEventHandler(async (event) => {
     const doc = docs[0];
     const filename = doc.filename.replace(/\s+/g, '_') + '_Export.pdf';
     
-    // Assemble the full document strictly from page data
     const [pages]: any = await db.query(`
       SELECT extracted_json, manual_html_override FROM pages 
       WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
@@ -24,15 +22,10 @@ export default defineEventHandler(async (event) => {
     
     let innerHtml = '';
     for (const page of pages) {
-      // Wrap each page in a strict Legal sized container
       innerHtml += `<div class="page-container">\n`;
-      
-      // If the user made WYSIWYG overrides on this page, use that.
       if (page.manual_html_override) {
         innerHtml += page.manual_html_override;
-      } 
-      // Otherwise use the strict JSON pipeline
-      else if (page.extracted_json) {
+      } else if (page.extracted_json) {
         try {
           const data = JSON.parse(page.extracted_json);
           if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
@@ -47,15 +40,14 @@ export default defineEventHandler(async (event) => {
       innerHtml += `</div>\n`;
     }
 
-    // Wrap HTML in a print-ready document structure
     const fullHtml = `
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
         <style>
-          /* Strict Print Styling - Legal Paper Size */
-          @page { size: legal; margin: 0; }
+          /* Strict Print Styling - Tamaño Oficio (8.5 x 13 inches) */
+          @page { size: 8.5in 13in; margin: 0; }
           body { 
             margin: 0; 
             padding: 0; 
@@ -65,7 +57,7 @@ export default defineEventHandler(async (event) => {
           }
           .page-container { 
             width: 8.5in; 
-            height: 14in; 
+            height: 13in; 
             padding: 1in; 
             box-sizing: border-box; 
             overflow: hidden; 
@@ -80,7 +72,6 @@ export default defineEventHandler(async (event) => {
       </html>
     `;
 
-    // 2. Validate token and HTML payload payload state safely 
     const maskedToken = token ? `${token.substring(0, 4)}...${token.slice(-4)}` : 'MISSING';
     const htmlStatus = fullHtml && fullHtml.length > 0 ? `Non-empty (${fullHtml.length} bytes)` : 'EMPTY';
     
@@ -88,7 +79,6 @@ export default defineEventHandler(async (event) => {
     console.log(`[Export Pipeline] Auth Token exists: ${!!token} (Bearer ${maskedToken})`);
     console.log(`[Export Pipeline] HTML Payload: ${htmlStatus}`);
     
-    // 3. Dispatch the raw JSON fetch directly to the rendering endpoint per exact requirements
     const renderResponse: any = await $fetch(`https://puppeteer.casitaapps.com/render-pdf`, {
       method: 'POST',
       headers: {
@@ -101,14 +91,12 @@ export default defineEventHandler(async (event) => {
       }
     });
 
-    // 4. Validate and extract the explicit remote URL from the JSON response
     if (!renderResponse || !renderResponse.success || !renderResponse.url) {
       throw new Error(renderResponse?.error || "Render service failed to return a valid PDF URL.");
     }
 
     console.log(`[Export Pipeline] Render successful. Storage URL obtained: ${renderResponse.url}`);
     
-    // 5. Return URL directly to client to handle the final download phase directly from storage
     return { success: true, url: renderResponse.url };
 
   } catch (err: any) {

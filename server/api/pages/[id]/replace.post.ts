@@ -10,15 +10,14 @@ export default defineEventHandler(async (event) => {
     if (!formData || formData.length === 0) throw createError({ statusCode: 400, statusMessage: 'No file data received.' });
 
     const fileField = formData.find(f => f.name === 'file');
-    const fileHdField = formData.find(f => f.name === 'file_hd');
+    const fileThumbField = formData.find(f => f.name === 'file_thumb');
     if (!fileField) throw createError({ statusCode: 400, statusMessage: 'Missing file field.' });
 
-    const [thumbnailUrl, hdUrl] = await Promise.all([
-      uploadToCasita(fileField.data, `replace_thumb_${id}.jpg`, 'image/jpeg'),
-      fileHdField ? uploadToCasita(fileHdField.data, `replace_hd_${id}.jpg`, 'image/jpeg') : Promise.resolve(null)
+    const [imageUrl, thumbnailUrl] = await Promise.all([
+      uploadToCasita(fileField.data, `replace_${id}.jpg`, 'image/jpeg'),
+      fileThumbField ? uploadToCasita(fileThumbField.data, `replace_thumb_${id}.jpg`, 'image/jpeg') : Promise.resolve(null)
     ]);
 
-    const finalImageUrl = hdUrl || thumbnailUrl;
     const db = getDb();
     
     await db.query(
@@ -35,10 +34,10 @@ export default defineEventHandler(async (event) => {
            is_stale = FALSE,
            is_manual_translation = FALSE
        WHERE id = ?`,
-      [finalImageUrl, thumbnailUrl, id]
+      [imageUrl, thumbnailUrl || imageUrl, id]
     );
 
-    return { success: true, image_url: finalImageUrl, thumbnail_url: thumbnailUrl };
+    return { success: true, image_url: imageUrl, thumbnail_url: thumbnailUrl };
     
   } catch (err: any) {
     console.error(`[Server API ERROR] Exception in /pages/[id]/replace:`, err);

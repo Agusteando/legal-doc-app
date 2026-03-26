@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
     const docIdField = formData.find(f => f.name === 'document_id');
     const pageNumField = formData.find(f => f.name === 'page_number');
     const sourceFileField = formData.find(f => f.name === 'source_filename');
-    const fileField = formData.find(f => f.name === 'file');        // Preview version
-    const fileHdField = formData.find(f => f.name === 'file_hd');  // HD version
+    const fileField = formData.find(f => f.name === 'file');           // HD Main Image
+    const fileThumbField = formData.find(f => f.name === 'file_thumb'); // Thumb
 
     if (!docIdField || !pageNumField || !fileField || !sourceFileField) {
       throw createError({ statusCode: 400, statusMessage: 'Missing required form fields.' });
@@ -25,14 +25,10 @@ export default defineEventHandler(async (event) => {
     const pageNum = parseInt(pageNumField.data.toString());
     const sourceFilename = sourceFileField.data.toString();
     
-    // Concurrently upload both the fast preview and HD image if provided
-    const [thumbnailUrl, hdUrl] = await Promise.all([
-      uploadToCasita(fileField.data, `thumb_${docId}_${pageNum}.jpg`, 'image/jpeg'),
-      fileHdField ? uploadToCasita(fileHdField.data, `hd_${docId}_${pageNum}.jpg`, 'image/jpeg') : Promise.resolve(null)
+    const [imageUrl, thumbnailUrl] = await Promise.all([
+      uploadToCasita(fileField.data, `page_${docId}_${pageNum}.jpg`, 'image/jpeg'),
+      fileThumbField ? uploadToCasita(fileThumbField.data, `thumb_${docId}_${pageNum}.jpg`, 'image/jpeg') : Promise.resolve(null)
     ]);
-
-    // Fallback if HD fails/wasn't provided
-    const finalImageUrl = hdUrl || thumbnailUrl;
 
     const db = getDb();
     const pageId = randomUUID();
@@ -42,10 +38,10 @@ export default defineEventHandler(async (event) => {
 
     await db.query(
       `INSERT INTO pages (id, document_id, source_filename, page_number, sort_order, image_url, thumbnail_url, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_review')`,
-      [pageId, docId, sourceFilename, pageNum, nextOrder, finalImageUrl, thumbnailUrl]
+      [pageId, docId, sourceFilename, pageNum, nextOrder, imageUrl, thumbnailUrl || imageUrl]
     );
 
-    return { id: pageId, image_url: finalImageUrl, thumbnail_url: thumbnailUrl, sort_order: nextOrder };
+    return { id: pageId, image_url: imageUrl, thumbnail_url: thumbnailUrl, sort_order: nextOrder };
     
   } catch (err: any) {
     console.error(`[Server API ERROR] Exception in /pages/upload:`, err);
