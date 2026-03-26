@@ -11,6 +11,32 @@ export interface LogEntry {
   msg: string;
 }
 
+// Helper to push binaries directly to storage from the browser
+const uploadDirectToStorage = async (blob: Blob, filename: string, configUploadUrl: string): Promise<string> => {
+  const uploadUrl = new URL(configUploadUrl);
+  uploadUrl.searchParams.set('includeUrl', 'true');
+  
+  const fd = new FormData();
+  fd.append('file', blob, filename);
+  
+  const response = await fetch(uploadUrl.toString(), { method: 'POST', body: fd });
+  if (!response.ok) throw new Error(`Storage upload failed: HTTP ${response.status}`);
+  
+  const text = await response.text();
+  let finalUrl = '';
+  try {
+    const json = JSON.parse(text);
+    finalUrl = json.url || json.Url || json.URL || '';
+  } catch {
+    finalUrl = text.trim();
+  }
+  
+  if (!finalUrl || !finalUrl.startsWith('http')) {
+    throw new Error(`Invalid URL returned from storage bucket: ${text.substring(0, 50)}`);
+  }
+  return finalUrl;
+};
+
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     let reviewer = '';
@@ -88,6 +114,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.isUploading = true;
       this.uploadProgress = 0;
       
+      const config = useRuntimeConfig();
+      const storageUrl = config.public.storageUploadUrl;
+      
       try {
         if (!this.document) {
           this.uploadStatusText = 'Initializing Single Project...';
@@ -135,14 +164,26 @@ export const useWorkspaceStore = defineStore('workspace', {
             await page.render({ canvasContext: cHd.getContext('2d') as CanvasRenderingContext2D, viewport: vpHd }).promise;
             const blobHd = await new Promise<Blob | null>(res => cHd.toBlob(res, 'image/jpeg', 0.85));
 
-            const formData = new FormData();
-            formData.append('document_id', this.document.id);
-            formData.append('source_filename', docObj.file.name);
-            formData.append('page_number', i.toString());
-            if (blobHd) formData.append('file', blobHd);
-            if (blobThumb) formData.append('file_thumb', blobThumb);
+            this.uploadStatusText = `Uploading directly to storage: ${docObj.file.name} (Page ${i}/${docObj.pages})`;
 
-            const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+            const [imageUrl, thumbUrl] = await Promise.all([
+              blobHd ? uploadDirectToStorage(blobHd, `page_${this.document.id}_${i}.jpg`, storageUrl) : Promise.resolve(null),
+              blobThumb ? uploadDirectToStorage(blobThumb, `thumb_${this.document.id}_${i}.jpg`, storageUrl) : Promise.resolve(null)
+            ]);
+
+            if (!imageUrl) throw new Error("HD Image upload failed or returned empty URL.");
+
+            // Bypass Vercel binary limits: sending strictly JSON to backend for database persistence
+            const uploadRes: any = await $fetch('/api/pages/upload', { 
+              method: 'POST', 
+              body: {
+                document_id: this.document.id,
+                source_filename: docObj.file.name,
+                page_number: i,
+                image_url: imageUrl,
+                thumbnail_url: thumbUrl || imageUrl
+              } 
+            });
             uploadedIds.push(uploadRes.id);
             
             totalPagesProcessed++;
@@ -186,6 +227,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.uploadProgress = 0;
       this.uploadStatusText = 'Replacing Page...';
       
+      const config = useRuntimeConfig();
+      const storageUrl = config.public.storageUploadUrl;
+
       try {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -212,17 +256,31 @@ export const useWorkspaceStore = defineStore('workspace', {
           await page.render({ canvasContext: cHd.getContext('2d') as CanvasRenderingContext2D, viewport: vpHd }).promise;
           const blobHd = await new Promise<Blob | null>(res => cHd.toBlob(res, 'image/jpeg', 0.85));
           
-          const formData = new FormData();
-          if (blobHd) formData.append('file', blobHd);
-          if (blobThumb) formData.append('file_thumb', blobThumb);
-          
+          this.uploadStatusText = `Uploading replacement to storage (Page ${i}/${totalPages})`;
+
+          const [imageUrl, thumbUrl] = await Promise.all([
+            blobHd ? uploadDirectToStorage(blobHd, `replace_${targetId}_${i}.jpg`, storageUrl) : Promise.resolve(null),
+            blobThumb ? uploadDirectToStorage(blobThumb, `replace_thumb_${targetId}_${i}.jpg`, storageUrl) : Promise.resolve(null)
+          ]);
+
+          if (!imageUrl) throw new Error("Replacement image upload failed.");
+
           if (i === 1) {
-             await $fetch(`/api/pages/${targetId}/replace`, { method: 'POST', body: formData });
+             await $fetch(`/api/pages/${targetId}/replace`, { 
+               method: 'POST', 
+               body: { image_url: imageUrl, thumbnail_url: thumbUrl || imageUrl } 
+             });
           } else {
-             formData.append('document_id', this.document.id);
-             formData.append('source_filename', file.name);
-             formData.append('page_number', i.toString());
-             const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
+             const uploadRes: any = await $fetch('/api/pages/upload', { 
+               method: 'POST', 
+               body: {
+                 document_id: this.document.id,
+                 source_filename: file.name,
+                 page_number: i,
+                 image_url: imageUrl,
+                 thumbnail_url: thumbUrl || imageUrl
+               } 
+             });
              newPageIds.push(uploadRes.id);
           }
           this.uploadProgress = Math.round((i / totalPages) * 100);
