@@ -8,17 +8,16 @@ export default defineEventHandler(async (event) => {
   try {
     const formData = await readMultipartFormData(event);
     if (!formData || formData.length === 0) {
-      console.error(`[Server API ERROR] Multipart payload is empty or undefined.`);
       throw createError({ statusCode: 400, statusMessage: 'No file data received in payload.' });
     }
 
     const docIdField = formData.find(f => f.name === 'document_id');
     const pageNumField = formData.find(f => f.name === 'page_number');
-    const fileField = formData.find(f => f.name === 'file');
     const sourceFileField = formData.find(f => f.name === 'source_filename');
+    const fileField = formData.find(f => f.name === 'file');        // Preview version
+    const fileHdField = formData.find(f => f.name === 'file_hd');  // HD version
 
     if (!docIdField || !pageNumField || !fileField || !sourceFileField) {
-      console.error(`[Server API ERROR] Missing fields. docId=${!!docIdField}, pageNum=${!!pageNumField}, file=${!!fileField}, sourceFile=${!!sourceFileField}`);
       throw createError({ statusCode: 400, statusMessage: 'Missing required form fields.' });
     }
 
@@ -26,28 +25,30 @@ export default defineEventHandler(async (event) => {
     const pageNum = parseInt(pageNumField.data.toString());
     const sourceFilename = sourceFileField.data.toString();
     
-    console.log(`[Server API] Processing page ${pageNum} for doc ${docId}. Delegating to Casita...`);
-    const imageUrl = await uploadToCasita(fileField.data, `page_${docId}_${pageNum}.png`, 'image/png');
+    // Concurrently upload both the fast preview and HD image if provided
+    const [thumbnailUrl, hdUrl] = await Promise.all([
+      uploadToCasita(fileField.data, `thumb_${docId}_${pageNum}.jpg`, 'image/jpeg'),
+      fileHdField ? uploadToCasita(fileHdField.data, `hd_${docId}_${pageNum}.jpg`, 'image/jpeg') : Promise.resolve(null)
+    ]);
+
+    // Fallback if HD fails/wasn't provided
+    const finalImageUrl = hdUrl || thumbnailUrl;
 
     const db = getDb();
     const pageId = randomUUID();
 
-    console.log(`[Server API] Querying MAX sort_order for doc ${docId}...`);
     const [orderRes]: any = await db.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM pages WHERE document_id = ?`, [docId]);
     const nextOrder = orderRes[0].next_order;
 
-    console.log(`[Server API] Inserting DB record for page ${pageId} at order ${nextOrder}...`);
     await db.query(
-      `INSERT INTO pages (id, document_id, source_filename, page_number, sort_order, image_url, status) VALUES (?, ?, ?, ?, ?, ?, 'pending_review')`,
-      [pageId, docId, sourceFilename, pageNum, nextOrder, imageUrl]
+      `INSERT INTO pages (id, document_id, source_filename, page_number, sort_order, image_url, thumbnail_url, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_review')`,
+      [pageId, docId, sourceFilename, pageNum, nextOrder, finalImageUrl, thumbnailUrl]
     );
 
-    console.log(`[Server API] Page insert successful.`);
-    return { id: pageId, image_url: imageUrl, sort_order: nextOrder };
+    return { id: pageId, image_url: finalImageUrl, thumbnail_url: thumbnailUrl, sort_order: nextOrder };
     
   } catch (err: any) {
     console.error(`[Server API ERROR] Exception in /pages/upload:`, err);
-    // Preserve existing statusCode if it's a known error, otherwise wrap in 500
     if (err.statusCode) throw err;
     throw createError({ statusCode: 500, statusMessage: err.message || 'Internal Upload Error' });
   }

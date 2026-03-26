@@ -80,11 +80,15 @@ export default defineEventHandler(async (event) => {
       </html>
     `;
 
-    // 2. Safely log the presence of the auth token without exposing the full secret
+    // 2. Validate token and HTML payload payload state safely 
     const maskedToken = token ? `${token.substring(0, 4)}...${token.slice(-4)}` : 'MISSING';
-    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}. Auth Token: Bearer ${maskedToken}`);
+    const htmlStatus = fullHtml && fullHtml.length > 0 ? `Non-empty (${fullHtml.length} bytes)` : 'EMPTY';
     
-    // 3. Strict, raw JSON fetch per requirements
+    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}`);
+    console.log(`[Export Pipeline] Auth Token exists: ${!!token} (Bearer ${maskedToken})`);
+    console.log(`[Export Pipeline] HTML Payload: ${htmlStatus}`);
+    
+    // 3. Dispatch the raw JSON fetch directly to the rendering endpoint per exact requirements
     const renderResponse: any = await $fetch(`https://puppeteer.casitaapps.com/render-pdf`, {
       method: 'POST',
       headers: {
@@ -97,12 +101,14 @@ export default defineEventHandler(async (event) => {
       }
     });
 
-    // 4. Validate and return the exact URL from the JSON response
+    // 4. Validate and extract the explicit remote URL from the JSON response
     if (!renderResponse || !renderResponse.success || !renderResponse.url) {
       throw new Error(renderResponse?.error || "Render service failed to return a valid PDF URL.");
     }
 
-    console.log(`[Export Pipeline] Render successful. URL: ${renderResponse.url}`);
+    console.log(`[Export Pipeline] Render successful. Storage URL obtained: ${renderResponse.url}`);
+    
+    // 5. Return URL directly to client to handle the final download phase directly from storage
     return { success: true, url: renderResponse.url };
 
   } catch (err: any) {

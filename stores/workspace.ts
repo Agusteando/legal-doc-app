@@ -22,6 +22,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       selectedPageIds: new Set<string>(),
       lastSelectedId: null as string | null,
       
+      isPanelExpanded: false,
       isUploading: false,
       uploadStatusText: '',
       uploadProgress: 0,
@@ -120,21 +121,27 @@ export const useWorkspaceStore = defineStore('workspace', {
             await new Promise(r => setTimeout(r, 20)); 
             
             const page = await docObj.pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 }); 
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error("Canvas context failed.");
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
             
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
+            // Generate Fast Load Preview (Scale 1.0, JPEG)
+            const vpThumb = page.getViewport({ scale: 1.0 }); 
+            const cThumb = document.createElement('canvas');
+            cThumb.width = vpThumb.width; cThumb.height = vpThumb.height;
+            await page.render({ canvasContext: cThumb.getContext('2d') as CanvasRenderingContext2D, viewport: vpThumb }).promise;
+            const blobThumb = await new Promise<Blob | null>(res => cThumb.toBlob(res, 'image/jpeg', 0.6));
+
+            // Generate HD Version (Scale 2.5, JPEG)
+            const vpHd = page.getViewport({ scale: 2.5 }); 
+            const cHd = document.createElement('canvas');
+            cHd.width = vpHd.width; cHd.height = vpHd.height;
+            await page.render({ canvasContext: cHd.getContext('2d') as CanvasRenderingContext2D, viewport: vpHd }).promise;
+            const blobHd = await new Promise<Blob | null>(res => cHd.toBlob(res, 'image/jpeg', 0.9));
 
             const formData = new FormData();
             formData.append('document_id', this.document.id);
             formData.append('source_filename', docObj.file.name);
             formData.append('page_number', i.toString());
-            formData.append('file', blob as Blob);
+            if (blobThumb) formData.append('file', blobThumb);
+            if (blobHd) formData.append('file_hd', blobHd);
 
             const uploadRes: any = await $fetch('/api/pages/upload', { method: 'POST', body: formData });
             uploadedIds.push(uploadRes.id);
@@ -193,18 +200,24 @@ export const useWorkspaceStore = defineStore('workspace', {
           await new Promise(r => setTimeout(r, 20));
           
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) continue;
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          await page.render({ canvasContext: ctx, viewport }).promise;
-          const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
-          if (!blob) continue;
+          
+          // Fast Preview
+          const vpThumb = page.getViewport({ scale: 1.0 });
+          const cThumb = document.createElement('canvas');
+          cThumb.width = vpThumb.width; cThumb.height = vpThumb.height;
+          await page.render({ canvasContext: cThumb.getContext('2d') as CanvasRenderingContext2D, viewport: vpThumb }).promise;
+          const blobThumb = await new Promise<Blob | null>(res => cThumb.toBlob(res, 'image/jpeg', 0.6));
+          
+          // HD Version
+          const vpHd = page.getViewport({ scale: 2.5 });
+          const cHd = document.createElement('canvas');
+          cHd.width = vpHd.width; cHd.height = vpHd.height;
+          await page.render({ canvasContext: cHd.getContext('2d') as CanvasRenderingContext2D, viewport: vpHd }).promise;
+          const blobHd = await new Promise<Blob | null>(res => cHd.toBlob(res, 'image/jpeg', 0.9));
           
           const formData = new FormData();
-          formData.append('file', blob as Blob);
+          if (blobThumb) formData.append('file', blobThumb);
+          if (blobHd) formData.append('file_hd', blobHd);
           
           if (i === 1) {
              await $fetch(`/api/pages/${targetId}/replace`, { method: 'POST', body: formData });

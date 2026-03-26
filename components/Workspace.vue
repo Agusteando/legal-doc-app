@@ -33,7 +33,9 @@
       <PageStrip class="w-[260px] border-r border-slate-800 flex-shrink-0 z-20" />
       
       <!-- Middle Pane: Source & Context Validation -->
-      <DetailView class="w-[30%] min-w-[400px] max-w-[500px] border-r border-slate-800 flex-shrink-0 z-10 shadow-2xl" />
+      <!-- Smooth expansion driven by workspace.isPanelExpanded state -->
+      <DetailView class="border-r border-slate-800 flex-shrink-0 z-10 shadow-2xl transition-all duration-300 ease-in-out" 
+                  :class="workspace.isPanelExpanded ? 'w-[45%] max-w-[800px]' : 'w-[28%] min-w-[350px] max-w-[450px]'" />
       
       <!-- Right Pane: English Translation & WYSIWYG Canvas -->
       <DocumentEditor class="flex-1 min-w-0 z-0 bg-slate-200" />

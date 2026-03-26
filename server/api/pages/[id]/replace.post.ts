@@ -2,33 +2,29 @@ import { getDb } from '../../../utils/db';
 import { uploadToCasita } from '../../../utils/casita';
 
 export default defineEventHandler(async (event) => {
-  console.log(`[Server API] POST /pages/${event.context.params?.id}/replace - Request received.`);
   const id = event.context.params?.id;
-  
-  if (!id) {
-    throw createError({ statusCode: 400, statusMessage: 'Page ID is required.' });
-  }
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'Page ID is required.' });
 
   try {
     const formData = await readMultipartFormData(event);
-    if (!formData || formData.length === 0) {
-      throw createError({ statusCode: 400, statusMessage: 'No file data received in payload.' });
-    }
+    if (!formData || formData.length === 0) throw createError({ statusCode: 400, statusMessage: 'No file data received.' });
 
     const fileField = formData.find(f => f.name === 'file');
-    if (!fileField) {
-      throw createError({ statusCode: 400, statusMessage: 'Missing file field.' });
-    }
+    const fileHdField = formData.find(f => f.name === 'file_hd');
+    if (!fileField) throw createError({ statusCode: 400, statusMessage: 'Missing file field.' });
 
-    console.log(`[Server API] Delegating page replacement visual to Casita...`);
-    const imageUrl = await uploadToCasita(fileField.data, `replace_${id}.png`, 'image/png');
+    const [thumbnailUrl, hdUrl] = await Promise.all([
+      uploadToCasita(fileField.data, `replace_thumb_${id}.jpg`, 'image/jpeg'),
+      fileHdField ? uploadToCasita(fileHdField.data, `replace_hd_${id}.jpg`, 'image/jpeg') : Promise.resolve(null)
+    ]);
 
+    const finalImageUrl = hdUrl || thumbnailUrl;
     const db = getDb();
     
-    console.log(`[Server API] Nullifying downstream page data and applying visual replace...`);
     await db.query(
       `UPDATE pages 
        SET image_url = ?, 
+           thumbnail_url = ?,
            status = 'pending_review', 
            extracted_json = NULL, 
            source_text = NULL, 
@@ -39,10 +35,10 @@ export default defineEventHandler(async (event) => {
            is_stale = FALSE,
            is_manual_translation = FALSE
        WHERE id = ?`,
-      [imageUrl, id]
+      [finalImageUrl, thumbnailUrl, id]
     );
 
-    return { success: true, image_url: imageUrl };
+    return { success: true, image_url: finalImageUrl, thumbnail_url: thumbnailUrl };
     
   } catch (err: any) {
     console.error(`[Server API ERROR] Exception in /pages/[id]/replace:`, err);

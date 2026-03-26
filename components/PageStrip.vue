@@ -35,7 +35,7 @@
           <div class="w-10 h-14 bg-slate-800 border border-slate-700/80 rounded overflow-hidden shrink-0 relative shadow-sm flex items-center justify-center">
             <!-- Lazy Native Skeleton Image -->
             <img 
-              :src="page.image_url" 
+              :src="page.thumbnail_url || page.image_url" 
               loading="lazy" 
               decoding="async" 
               @load="$event.target.classList.remove('opacity-0')"

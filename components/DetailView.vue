@@ -5,8 +5,15 @@
       <!-- Toolbar Header -->
       <div class="h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-[#0f1117] shrink-0 z-10 shadow-sm">
         <div class="flex items-center space-x-3">
+          <!-- Expand/Collapse Toggle -->
+          <button @click="workspace.isPanelExpanded = !workspace.isPanelExpanded" class="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700" :title="workspace.isPanelExpanded ? 'Collapse Validation Panel' : 'Expand Validation Panel'">
+            <Minimize2Icon v-if="workspace.isPanelExpanded" class="w-4 h-4" />
+            <Maximize2Icon v-else class="w-4 h-4" />
+          </button>
+          
+          <div class="w-px h-5 bg-slate-800"></div>
+          
           <span class="text-xs font-bold text-slate-400 whitespace-nowrap">Page {{ page.sort_order }}</span>
-          <div class="w-px h-4 bg-slate-700"></div>
           
           <div class="flex space-x-1">
             <button @click="rotate" class="p-1.5 rounded hover:bg-slate-800 text-slate-400 transition-colors" title="Rotate Image">
@@ -28,35 +35,46 @@
         </div>
       </div>
 
-      <!-- Top Half: Pan & Zoom Raw Image Viewer -->
-      <div class="flex-1 relative bg-[#050608] border-b border-slate-800 overflow-hidden cursor-grab active:cursor-grabbing group"
-           @wheel="handleWheel" @mousedown="startPan" @mousemove="doPan" @mouseup="endPan" @mouseleave="endPan">
+      <!-- Top Half: Performant Pan & Zoom Image Viewer -->
+      <div ref="containerRef" class="flex-1 relative bg-[#050608] border-b border-slate-800 overflow-hidden cursor-grab active:cursor-grabbing group flex items-center justify-center"
+           @wheel.prevent="handleWheel" @mousedown="startPan" @mousemove="doPan" @mouseup="endPan" @mouseleave="endPan">
         
-        <!-- Progressive Loader -->
-        <div v-if="imageLoading" class="absolute inset-0 flex items-center justify-center bg-slate-950/50 z-10 backdrop-blur-sm transition-opacity duration-300">
-          <LoaderIcon class="w-8 h-8 text-blue-500 animate-spin" />
-        </div>
-        
-        <div v-if="page.is_excluded" class="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px]">
-          <span class="text-xs font-bold tracking-widest bg-red-600/90 text-white px-3 py-1.5 rounded shadow-lg border border-red-500">EXCLUDED</span>
-        </div>
-
+        <!-- Image Container for Origin Math -->
         <img 
-          :src="page.image_url" 
+          :src="displayUrl" 
           @load="imageLoading = false"
           loading="eager"
           decoding="async"
-          class="max-w-none origin-top-left will-change-transform shadow-2xl transition-opacity duration-300"
+          class="max-w-full max-h-full object-contain pointer-events-none will-change-transform shadow-2xl transition-opacity duration-300"
+          style="transform-origin: center;"
           :class="imageLoading ? 'opacity-0' : 'opacity-100'"
           :style="{ transform: `translate(${panX}px, ${panY}px) scale(${zoomScale}) rotate(${page.rotation}deg)` }"
           draggable="false"
         />
 
-        <!-- Image Controls Overlay -->
+        <!-- Progressive State -->
+        <div v-if="imageLoading" class="absolute inset-0 pointer-events-none flex items-center justify-center bg-slate-950/50 z-10 backdrop-blur-sm transition-opacity duration-300">
+          <LoaderIcon class="w-8 h-8 text-blue-500 animate-spin" />
+        </div>
+        
+        <!-- Excluded Warning -->
+        <div v-if="page.is_excluded" class="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px]">
+          <span class="text-xs font-bold tracking-widest bg-red-600/90 text-white px-3 py-1.5 rounded shadow-lg border border-red-500">EXCLUDED</span>
+        </div>
+
+        <!-- HD Toggle Overlay -->
+        <div class="absolute top-3 left-3 z-30 flex space-x-2">
+          <button @click.stop="isHdMode = !isHdMode; imageLoading = true" class="px-2.5 py-1.5 rounded text-[10px] font-bold tracking-widest uppercase shadow-lg transition-colors border"
+                  :class="isHdMode ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white backdrop-blur'">
+            {{ isHdMode ? 'HD View Active' : 'Load HD View' }}
+          </button>
+        </div>
+
+        <!-- Zoom Controls Overlay -->
         <div class="absolute bottom-3 right-3 z-30 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-lg p-1 shadow-lg flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button @click="zoomOut" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"><ZoomOutIcon class="w-3.5 h-3.5"/></button>
-          <button @click="resetZoom" class="px-2 text-slate-300 hover:text-white font-mono text-[10px] min-w-[3rem] text-center" title="Reset View">{{ Math.round(zoomScale * 100) }}%</button>
-          <button @click="zoomIn" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"><ZoomInIcon class="w-3.5 h-3.5"/></button>
+          <button @click.stop="zoomOut" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"><ZoomOutIcon class="w-3.5 h-3.5"/></button>
+          <button @click.stop="resetZoom" class="px-2 text-slate-300 hover:text-white font-mono text-[10px] min-w-[3rem] text-center" title="Reset View">{{ Math.round(zoomScale * 100) }}%</button>
+          <button @click.stop="zoomIn" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded"><ZoomInIcon class="w-3.5 h-3.5"/></button>
         </div>
       </div>
 
@@ -86,12 +104,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, reactive, nextTick } from 'vue';
-import { BanIcon, RotateCwIcon, ZoomInIcon, ZoomOutIcon, LoaderIcon, LayoutIcon } from 'lucide-vue-next';
+import { ref, computed, watch, reactive } from 'vue';
+import { BanIcon, RotateCwIcon, ZoomInIcon, ZoomOutIcon, LoaderIcon, LayoutIcon, Maximize2Icon, Minimize2Icon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 
 const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
+const containerRef = ref(null);
 
 // Text & Validation State
 const activeTab = ref('es');
@@ -100,11 +119,11 @@ const localTranslation = ref('');
 const localJson = ref('');
 const localStatus = ref('pending_review');
 const dirtyFlags = reactive({ source: false, translated: false, json: false });
-
 const isDirty = computed(() => dirtyFlags.source || dirtyFlags.translated);
 
-// Pan & Zoom Engine State
+// Pan, Zoom & HD State
 const imageLoading = ref(true);
+const isHdMode = ref(false);
 const zoomScale = ref(1);
 const panX = ref(0);
 const panY = ref(0);
@@ -112,9 +131,14 @@ const isDragging = ref(false);
 let startX = 0;
 let startY = 0;
 
+const displayUrl = computed(() => {
+  if (!page.value) return '';
+  // Load HD if manually toggled, otherwise load standard fast preview (falling back to image_url for legacy rows)
+  return isHdMode.value ? page.value.image_url : (page.value.thumbnail_url || page.value.image_url);
+});
+
 watch(() => page.value, (p) => {
   if (p) {
-    // Reset Data
     localSource.value = p.source_text || '';
     localTranslation.value = p.translated_text || '';
     localJson.value = p.extracted_json ? JSON.stringify(JSON.parse(p.extracted_json), null, 2) : '';
@@ -123,7 +147,8 @@ watch(() => page.value, (p) => {
     dirtyFlags.translated = false;
     dirtyFlags.json = false;
     
-    // Reset Image Engine
+    // Reset Engine
+    isHdMode.value = false;
     imageLoading.value = true;
     resetZoom();
   }
@@ -138,12 +163,23 @@ watch(localJson, (val) => {
   }
 });
 
-// High-Performance Pan/Zoom Logic
+// Cursor-Anchored Center Math
 const handleWheel = (e) => {
-  e.preventDefault();
-  const sensitivity = 0.0015;
-  const delta = -e.deltaY * sensitivity;
-  zoomScale.value = Math.min(Math.max(0.1, zoomScale.value + delta), 8);
+  if (!containerRef.value) return;
+  const zoomSensitivity = 0.002;
+  const delta = -e.deltaY * zoomSensitivity;
+  const newZoom = Math.min(Math.max(0.1, zoomScale.value + delta), 8);
+
+  const rect = containerRef.value.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  const mouseX = e.clientX - rect.left - centerX;
+  const mouseY = e.clientY - rect.top - centerY;
+
+  const scaleRatio = newZoom / zoomScale.value;
+  panX.value = mouseX - (mouseX - panX.value) * scaleRatio;
+  panY.value = mouseY - (mouseY - panY.value) * scaleRatio;
+  zoomScale.value = newZoom;
 };
 
 const startPan = (e) => {
@@ -154,7 +190,6 @@ const startPan = (e) => {
 
 const doPan = (e) => {
   if (!isDragging.value) return;
-  // Use requestAnimationFrame natively bounded by Vue reactivity
   panX.value = e.clientX - startX;
   panY.value = e.clientY - startY;
 };
@@ -192,7 +227,6 @@ const saveReview = async () => {
         await workspace.updatePageInfo(page.value.id, { extracted_json: compactJson, is_stale: false });
       } catch(e) { console.warn("Background layout sync failed:", e.message); }
     }
-    
     dirtyFlags.source = false;
     dirtyFlags.translated = false;
   }
