@@ -28,7 +28,7 @@
         </div>
       </div>
 
-      <!-- Main Validation Image: Amazon-Style Zoom Container -->
+      <!-- Main Validation Image: Jitter-Free Amazon-Style Zoom Container -->
       <div 
         ref="zoomContainer"
         class="flex-1 relative overflow-hidden flex items-center justify-center p-6 pb-16 z-0 bg-[#050608] cursor-crosshair"
@@ -45,14 +45,24 @@
           <span class="text-xs font-bold tracking-widest bg-red-600/90 text-white px-3 py-1.5 rounded shadow-lg border border-red-500">EXCLUDED</span>
         </div>
 
-        <img 
-          :src="page.image_url" 
-          @load="imageLoading = false"
-          class="block w-full h-full object-contain shadow-2xl will-change-transform pointer-events-none transition-transform"
-          :class="[imageLoading ? 'opacity-0' : 'opacity-100', isZoomed ? 'ease-linear duration-[50ms]' : 'ease-out duration-300']"
-          :style="{ transform: `rotate(${page.rotation}deg) scale(${isZoomed ? 3 : 1})`, transformOrigin }"
-          draggable="false"
-        />
+        <!-- Scale Wrapper ensures panning maps precisely 1:1 with cursor percentage without DOM redraw jitter -->
+        <div 
+          class="w-full h-full will-change-transform flex items-center justify-center"
+          :style="{ 
+            transform: `scale(${isZoomed ? 2.5 : 1})`, 
+            transformOrigin,
+            transition: isZoomed ? 'none' : 'transform 0.25s ease-out' 
+          }"
+        >
+          <img 
+            :src="page.image_url" 
+            @load="imageLoading = false"
+            class="block max-w-full max-h-full object-contain pointer-events-none drop-shadow-2xl transition-transform duration-300"
+            :class="imageLoading ? 'opacity-0' : 'opacity-100'"
+            :style="{ transform: `rotate(${page.rotation}deg)` }"
+            draggable="false"
+          />
+        </div>
       </div>
 
       <!-- Floating Data Inspector Drawer -->
@@ -96,12 +106,10 @@ const workspace = useWorkspaceStore();
 const page = computed(() => workspace.activePage);
 const zoomContainer = ref(null);
 
-// Jitter-free Amazon-Style Hover Zoom State
 const imageLoading = ref(true);
 const isZoomed = ref(false);
 const transformOrigin = ref('50% 50%');
 
-// Text Drawer State
 const activeTab = ref(null);
 const localSource = ref('');
 const localTranslation = ref('');
@@ -138,21 +146,11 @@ const toggleTab = (tabName) => {
 
 // Math uses the static unscaled bounding container for absolute jitter-free panning
 const onMouseMove = (e) => {
-  if (!isZoomed.value || !zoomContainer.value || !page.value) return;
-  
+  if (!isZoomed.value || !zoomContainer.value) return;
   const rect = zoomContainer.value.getBoundingClientRect();
   const xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
   const yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-
-  let originX = xPct;
-  let originY = yPct;
-  const rot = page.value.rotation % 360;
-
-  if (rot === 90) { originX = yPct; originY = 100 - xPct; }
-  else if (rot === 180) { originX = 100 - xPct; originY = 100 - yPct; }
-  else if (rot === 270) { originX = 100 - yPct; originY = xPct; }
-
-  transformOrigin.value = `${originX}% ${originY}%`;
+  transformOrigin.value = `${xPct}% ${yPct}%`;
 };
 
 const saveMetadata = async () => {

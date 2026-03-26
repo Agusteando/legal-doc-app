@@ -19,10 +19,12 @@ export default defineEventHandler(async (event) => {
     if (page.extracted_json) {
       try {
         const data = JSON.parse(page.extracted_json);
-        // Container relies strictly on 100% width matching the rigorous PDF margins. Bottom margin mimics standard previewing breaks.
+        // Container matches rigorous PDF margins mapping
         computedHtml += `<div class="page-container" style="width: 100%; box-sizing: border-box; overflow: hidden; page-break-after: always; position: relative; margin-bottom: 2rem;">\n`;
         if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
           data.layout_blocks.forEach((block: any) => computedHtml += renderLayoutBlock(block));
+        } else {
+          computedHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; line-height: 1.15; color: #000;">${data.translated_text || ''}</div>`;
         }
         computedHtml += `</div>\n`;
       } catch (e) {

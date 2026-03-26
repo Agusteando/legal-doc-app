@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
       messages:[
         { 
           role: "system", 
-          content: "You are a layout packager. Take the provided manually edited translation text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Preserve line breaks exactly using \\n. Assign realistic structural blocks ensuring professional and exact document fidelity." 
+          content: "You are a layout packager. Take the provided manually edited translation text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Preserve physical line breaks exactly using explicit \\n. Assign realistic structural blocks ensuring professional and exact document fidelity without adding any decorative inventions." 
         },
         { role: "user", content: `Repackage this text into layout blocks:\n\n${body.translated_text}` }
       ],

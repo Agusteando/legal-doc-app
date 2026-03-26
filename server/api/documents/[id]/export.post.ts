@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
           if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
             data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
           } else {
-             innerHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt;">${data.translated_text || ''}</div>`;
+             innerHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; line-height: 1.15; color: #000;">${data.translated_text || ''}</div>`;
           }
         } catch (e) {
           console.error(`[Export] Failed to parse JSON for page ${page.id}`);
@@ -46,12 +46,16 @@ export default defineEventHandler(async (event) => {
       <head>
         <meta charset="UTF-8">
         <style>
-          /* Strict Print Styling - Legal Base Profile */
+          /* Strict Print Styling - Legal Typography and Margins */
           @page { size: 8.5in 13in; margin: 1in; }
           body { 
             margin: 0; 
             padding: 0; 
             background: #fff; 
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 11pt;
+            line-height: 1.15;
+            color: #000;
             -webkit-print-color-adjust: exact; 
             print-color-adjust: exact;
           }

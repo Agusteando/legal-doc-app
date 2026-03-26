@@ -59,12 +59,12 @@ const schema = {
 const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks. You are an expert at parsing complex Latin American legal layouts. Break the document down granularly.
 
 CRITICAL HARD REQUIREMENTS:
-1. PRESERVE LEGAL FIDELITY: Paragraphs, true line breaks, headers, font size hierarchy, and overall text density MUST be reconstructed exactly as they appear visually. Use explicit \\n characters for literal line breaks within text strings.
-2. NEVER invent placeholders like 'Signature here' or 'Circular stamp with text'. Extract legible text ONLY. If it is illegible, do NOT extract or describe it.
-3. Do NOT invent decorative separators or aesthetic borders.
-4. Reproduce the layout accurately. Use 'table' strictly for tabular data or multi-column structural alignment.
-5. Respect text formatting (<b>, <i>, <u>). Use <big> or <small> for drastic size changes.
-6. Remember: The ultimate goal is an exact professional reproduction, not beautification.`;
+1. PRESERVE LEGAL FIDELITY: Reconstruct paragraphs, true line breaks, headers, font size hierarchy, spacing, and overall text density EXACTLY as they appear visually.
+2. USE TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings to mirror physical document line wrapping perfectly.
+3. NEVER invent placeholders like 'Signature here' or 'Circular stamp with text'. Extract legible text ONLY. If it is illegible, do NOT extract or describe it.
+4. NO DECORATIVE INVENTIONS: Do not invent fake separators, borders, or aesthetic padding. The goal is an exact professional reproduction, not beautification.
+5. Use 'table' strictly for tabular data or multi-column structural alignment to match layout spacing.
+6. Respect text formatting (<b>, <i>, <u>). Use <big> or <small> for drastic size changes.`;
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
@@ -88,7 +88,7 @@ export default defineEventHandler(async (event) => {
     const mimeType = imageResponse.headers.get('content-type') || 'image/png';
     const base64ImageUrl = `data:${mimeType};base64,${base64String}`;
 
-    // Kept gpt-5.4 exact specification as mandated
+    // Maintain GPT-5.4 requirement per strict instructions
     const response = await openai.chat.completions.create({
       model: "gpt-5.4",
       reasoning_effort: "medium",
@@ -98,7 +98,7 @@ export default defineEventHandler(async (event) => {
         {
           role: "user",
           content:[
-            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks prioritizing line break and font-size fidelity." },
+            { type: "text", text: "Process this complex legal document page image into structured JSON layout blocks prioritizing absolute line break and spacing fidelity." },
             { type: "image_url", image_url: { url: base64ImageUrl } }
           ]
         }

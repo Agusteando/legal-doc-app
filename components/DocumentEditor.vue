@@ -41,14 +41,14 @@
       <button @mousedown.prevent="exec('removeFormat')" class="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors" title="Clear Formatting"><EraserIcon class="w-4 h-4" /></button>
     </div>
     
-    <!-- Virtual Paper Canvas (Tamaño Oficio: 8.5 x 13 inches) with visual 1in padding mimicking print margins -->
+    <!-- Virtual Paper Canvas (Tamaño Oficio: 8.5 x 13 inches) with exact legal typography enforcement -->
     <div class="flex-1 overflow-auto py-8 px-4 flex justify-center custom-scrollbar relative">
       <div 
         ref="editorRef"
         contenteditable="true" 
         @input="onInput"
-        class="bg-white shadow-xl ring-1 ring-slate-900/10 w-[8.5in] min-h-[13in] max-w-full p-[1in] text-black focus:outline-none transition-shadow hover:shadow-2xl"
-        style="box-sizing: border-box; font-family: 'Times New Roman', Times, serif;">
+        class="bg-white shadow-xl ring-1 ring-slate-900/10 w-[8.5in] min-h-[13in] max-w-full p-[1in] focus:outline-none transition-shadow hover:shadow-2xl"
+        style="box-sizing: border-box; font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.15; font-size: 11pt;">
       </div>
     </div>
   </div>
@@ -91,7 +91,7 @@ const getCompiledHtml = (p) => {
     if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
       data.layout_blocks.forEach(block => { html += renderLayoutBlock(block); });
     } else { 
-      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; color: #000;">${data.translated_text || ''}</div>`; 
+      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; color: #000; line-height: 1.15;">${data.translated_text || ''}</div>`; 
     }
     // Allow pure styling to persist securely through DOMPurify
     return DOMPurify.sanitize(html, { ADD_ATTR: ['style'] });
