@@ -19,12 +19,12 @@ export default defineEventHandler(async (event) => {
     if (page.extracted_json) {
       try {
         const data = JSON.parse(page.extracted_json);
-        // Container matches rigorous PDF margins mapping and enforces OFICIO simulation internally if consumed elsewhere
-        computedHtml += `<div class="page-container" style="width: 100%; box-sizing: border-box; position: relative; margin-bottom: 2rem; page-break-after: always; font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.5; text-align: justify;">\n`;
+        // Container matches rigorous PDF Oficio 1-to-1 mapping
+        computedHtml += `<div class="page-container" style="width: 8.5in; height: 13in; padding: 0.8in 1in; box-sizing: border-box; position: relative; margin-bottom: 2rem; page-break-after: always; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; font-family: 'Times New Roman', Times, serif; font-size: 10.5pt; line-height: 1.35; text-align: justify; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); background: #fff;">\n`;
         if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
           data.layout_blocks.forEach((block: any) => computedHtml += renderLayoutBlock(block));
         } else {
-          computedHtml += `<div>${data.translated_text || ''}</div>`;
+          computedHtml += `<div style="flex-shrink: 1;">${data.translated_text || ''}</div>`;
         }
         computedHtml += `</div>\n`;
       } catch (e) {

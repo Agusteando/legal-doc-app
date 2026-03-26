@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
           if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
             data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
           } else {
-             innerHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; line-height: 1.5; color: #000; text-align: justify;">${data.translated_text || ''}</div>`;
+             innerHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:10.5pt; line-height: 1.35; color: #000; text-align: justify; flex-shrink: 1;">${data.translated_text || ''}</div>`;
           }
         } catch (e) {
           console.warn("Skipped invalid JSON block during export");
@@ -43,29 +43,39 @@ export default defineEventHandler(async (event) => {
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap');
           
-          /* Strict Print Styling - Legal Oficio Typography and Margins */
-          @page { size: 8.5in 13in; margin: 1in; }
+          /* Strict Print Styling - Zero @page margin enforces container boundaries */
+          @page { size: 8.5in 13in; margin: 0 !important; }
           body { 
             margin: 0; 
             padding: 0; 
             background: #fff; 
             font-family: 'Times New Roman', Times, serif;
-            font-size: 11pt;
-            line-height: 1.5;
+            font-size: 10.5pt;
+            line-height: 1.35;
             color: #000;
             text-align: justify;
             text-justify: inter-word;
             -webkit-print-color-adjust: exact; 
             print-color-adjust: exact;
           }
+          
+          /* The absolute bounds of a single page */
           .page-container { 
-            width: 100%; 
+            width: 8.5in; 
+            height: 13in;
+            padding: 0.8in 1in; /* Inner physical margins are modeled here */
             box-sizing: border-box; 
             position: relative;
             page-break-after: always;
+            page-break-inside: avoid;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            overflow: hidden; /* Guarantee zero bleed to 2nd page */
           }
+          
           p, div { widows: 2; orphans: 2; }
-          table { page-break-inside: auto; }
+          table { page-break-inside: auto; max-width: 100%; }
           tr { page-break-inside: avoid; page-break-after: auto; }
           b, strong { font-weight: bold; }
           i, em { font-style: italic; }

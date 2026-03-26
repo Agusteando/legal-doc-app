@@ -41,14 +41,14 @@
       <button @mousedown.prevent="exec('removeFormat')" class="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors" title="Clear Formatting"><EraserIcon class="w-4 h-4" /></button>
     </div>
     
-    <!-- Virtual Paper Canvas (Tamaño Oficio: 8.5 x 13 inches) with exact legal typography enforcement -->
+    <!-- Virtual Paper Canvas (Strict 1:1 Oficio constraint modeling the exported PDF exactness) -->
     <div class="flex-1 overflow-auto py-8 px-4 flex justify-center custom-scrollbar relative">
       <div 
         ref="editorRef"
         contenteditable="true" 
         @input="onInput"
         class="bg-white shadow-xl ring-1 ring-slate-900/10 focus:outline-none transition-shadow hover:shadow-2xl mx-auto"
-        style="width: 8.5in; min-height: 13in; max-width: 100%; padding: 1in; box-sizing: border-box; font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.5; font-size: 11pt; text-align: justify; text-justify: inter-word;">
+        style="width: 8.5in; height: 13in; padding: 0.8in 1in; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.35; font-size: 10.5pt; text-align: justify; text-justify: inter-word;">
       </div>
     </div>
   </div>
@@ -91,7 +91,7 @@ const getCompiledHtml = (p) => {
     if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
       data.layout_blocks.forEach(block => { html += renderLayoutBlock(block); });
     } else { 
-      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; color: #000; line-height: 1.5; text-align: justify;">${data.translated_text || ''}</div>`; 
+      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:10.5pt; color: #000; line-height: 1.35; text-align: justify;">${data.translated_text || ''}</div>`; 
     }
     // Allow pure styling to persist securely through DOMPurify
     return DOMPurify.sanitize(html, { ADD_ATTR: ['style'] });
