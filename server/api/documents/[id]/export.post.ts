@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
 
     console.log(`[Export Util] Dispatching PDF render request to ${config.renderServiceUrl}...`);
     
-    // Robust multi-layered auth payload to survive strict API Gateways
+    // Robust, redundant multi-layered auth payload to bypass strict VM gateway strips.
     const renderResponse: any = await $fetch(`${config.renderServiceUrl}/render-pdf`, {
       method: 'POST',
       headers: {

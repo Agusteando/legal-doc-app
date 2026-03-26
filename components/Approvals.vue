@@ -1,24 +1,24 @@
 <template>
   <div class="flex items-center space-x-6">
     <div class="flex items-center space-x-2">
-      <span class="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Rev 1</span>
-      <input v-model="localApp1Name" @blur="saveApprovals" placeholder="Initials" class="bg-transparent border-b border-slate-700 hover:border-slate-500 px-1 py-1 w-16 text-sm text-slate-200 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 text-center" />
-      <select v-model="localApp1Status" @change="saveApprovals" class="bg-transparent text-sm cursor-pointer outline-none transition-all appearance-none pr-4 font-medium" :class="statusColor(localApp1Status)">
-        <option value="" class="text-slate-500 bg-slate-900">Pending</option>
-        <option value="approved" class="text-emerald-400 bg-slate-900">Approved</option>
-        <option value="rejected" class="text-red-400 bg-slate-900">Rejected</option>
+      <span class="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Rev 1</span>
+      <input v-model="localApp1Name" @blur="saveApprovals" placeholder="Initials" class="bg-transparent border-b border-transparent hover:border-slate-300 px-1 py-0.5 w-16 text-sm text-slate-700 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-center font-medium" />
+      <select v-model="localApp1Status" @change="saveApprovals" class="bg-transparent text-sm cursor-pointer outline-none transition-all appearance-none font-bold" :class="statusColor(localApp1Status)">
+        <option value="" class="text-slate-400">Pending</option>
+        <option value="approved" class="text-emerald-600">Approved</option>
+        <option value="rejected" class="text-red-600">Rejected</option>
       </select>
     </div>
     
-    <div class="w-px h-4 bg-slate-800"></div>
+    <div class="w-px h-4 bg-slate-300"></div>
     
     <div class="flex items-center space-x-2">
-      <span class="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Rev 2</span>
-      <input v-model="localApp2Name" @blur="saveApprovals" placeholder="Initials" class="bg-transparent border-b border-slate-700 hover:border-slate-500 px-1 py-1 w-16 text-sm text-slate-200 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 text-center" />
-      <select v-model="localApp2Status" @change="saveApprovals" class="bg-transparent text-sm cursor-pointer outline-none transition-all appearance-none pr-4 font-medium" :class="statusColor(localApp2Status)">
-        <option value="" class="text-slate-500 bg-slate-900">Pending</option>
-        <option value="approved" class="text-emerald-400 bg-slate-900">Approved</option>
-        <option value="rejected" class="text-red-400 bg-slate-900">Rejected</option>
+      <span class="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Rev 2</span>
+      <input v-model="localApp2Name" @blur="saveApprovals" placeholder="Initials" class="bg-transparent border-b border-transparent hover:border-slate-300 px-1 py-0.5 w-16 text-sm text-slate-700 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 text-center font-medium" />
+      <select v-model="localApp2Status" @change="saveApprovals" class="bg-transparent text-sm cursor-pointer outline-none transition-all appearance-none font-bold" :class="statusColor(localApp2Status)">
+        <option value="" class="text-slate-400">Pending</option>
+        <option value="approved" class="text-emerald-600">Approved</option>
+        <option value="rejected" class="text-red-600">Rejected</option>
       </select>
     </div>
   </div>
@@ -36,9 +36,9 @@ const localApp2Name = ref('');
 const localApp2Status = ref('');
 
 const statusColor = (status) => {
-  if (status === 'approved') return 'text-emerald-400';
-  if (status === 'rejected') return 'text-red-400';
-  return 'text-slate-400';
+  if (status === 'approved') return 'text-emerald-600';
+  if (status === 'rejected') return 'text-red-600';
+  return 'text-amber-500';
 };
 
 onMounted(() => {

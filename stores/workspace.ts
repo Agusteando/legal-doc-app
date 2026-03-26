@@ -38,7 +38,17 @@ export const useWorkspaceStore = defineStore('workspace', {
     orderedPages: (state) => [...state.pages].filter(p => !p.is_deleted).sort((a, b) => a.sort_order - b.sort_order),
     selectedPages: (state) => state.pages.filter(p => state.selectedPageIds.has(p.id) && !p.is_deleted),
     activePage: (state) => state.pages.find(p => p.id === state.lastSelectedId && !p.is_deleted) || state.orderedPages[0],
-    sourceFiles: (state) => Array.from(new Set(state.pages.filter(p => !p.is_deleted).map(p => p.source_filename)))
+    sourceFiles: (state) => Array.from(new Set(state.pages.filter(p => !p.is_deleted).map(p => p.source_filename))),
+    progressStats: (state) => {
+      const active = state.pages.filter(p => !p.is_deleted);
+      return {
+        total: active.length,
+        approved: active.filter(p => p.status === 'approved').length,
+        needsWork: active.filter(p => p.status === 'needs_work').length,
+        processing: active.filter(p => p.job_status === 'processing').length,
+        pending: active.filter(p => p.status === 'pending_review' && p.job_status !== 'processing').length
+      };
+    }
   },
   actions: {
     log(level: 'info' | 'success' | 'warn' | 'error' | 'debug', msg: string) {
