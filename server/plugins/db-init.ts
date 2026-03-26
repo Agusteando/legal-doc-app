@@ -52,7 +52,7 @@ export default defineNitroPlugin(async () => {
     try { await db.query(`ALTER TABLE pages ADD COLUMN is_manual_translation BOOLEAN DEFAULT FALSE`); } catch (e) {}
     try { await db.query(`ALTER TABLE pages ADD COLUMN is_stale BOOLEAN DEFAULT FALSE`); } catch (e) {}
     try { await db.query(`ALTER TABLE pages ADD COLUMN notes TEXT`); } catch (e) {}
-    try { await db.query(`ALTER TABLE pages MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending_review'`); } catch (e) {}
+    try { await db.query(`ALTER TABLE pages ADD COLUMN manual_html_override LONGTEXT`); } catch (e) {}
     try { await db.query(`UPDATE pages SET status = 'pending_review' WHERE status = 'pending'`); } catch (e) {}
 
     console.log("Database tables initialized successfully.");

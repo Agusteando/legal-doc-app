@@ -1,11 +1,10 @@
 import { getDb } from '../../../utils/db';
 import { renderLayoutBlock } from '../../../../utils/renderer';
-import { useRuntimeConfig } from '#imports';
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
   const db = getDb();
-  const config = useRuntimeConfig();
+  const token = process.env.RENDER_SERVICE_TOKEN;
 
   try {
     const [docs]: any = await db.query(`SELECT * FROM documents WHERE id = ? LIMIT 1`, [id]);
@@ -14,26 +13,34 @@ export default defineEventHandler(async (event) => {
     const doc = docs[0];
     const filename = doc.filename.replace(/\s+/g, '_') + '_Export.pdf';
     
-    // Strict JSON -> HTML pipeline compilation
+    // Assemble the full document strictly from page data
     const [pages]: any = await db.query(`
-      SELECT extracted_json FROM pages 
+      SELECT extracted_json, manual_html_override FROM pages 
       WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
       ORDER BY sort_order ASC
     `, [id]);
     
     let innerHtml = '';
     for (const page of pages) {
-      if (page.extracted_json) {
+      // Wrap each page in a strict Legal sized container
+      innerHtml += `<div class="page-container">\n`;
+      
+      // If the user made WYSIWYG overrides on this page, use that.
+      if (page.manual_html_override) {
+        innerHtml += page.manual_html_override;
+      } 
+      // Otherwise use the strict JSON pipeline
+      else if (page.extracted_json) {
         try {
           const data = JSON.parse(page.extracted_json);
-          // Force a strict container around each page to guarantee 1:1 printing
-          innerHtml += `<div class="page-container">\n`;
           if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
             data.layout_blocks.forEach((block: any) => innerHtml += renderLayoutBlock(block));
+          } else {
+             innerHtml += `<p style="font-family:'Times New Roman', Times, serif; font-size:11pt;">${data.translated_text || ''}</p>`;
           }
-          innerHtml += `</div>\n`;
         } catch (e) {}
       }
+      innerHtml += `</div>\n`;
     }
 
     // Wrap HTML in a print-ready document structure
@@ -43,8 +50,8 @@ export default defineEventHandler(async (event) => {
       <head>
         <meta charset="UTF-8">
         <style>
-          /* Strict Print Styling */
-          @page { size: letter; margin: 0; }
+          /* Strict Print Styling - Legal Paper Size */
+          @page { size: legal; margin: 0; }
           body { 
             margin: 0; 
             padding: 0; 
@@ -54,7 +61,7 @@ export default defineEventHandler(async (event) => {
           }
           .page-container { 
             width: 8.5in; 
-            height: 11in; 
+            height: 14in; 
             padding: 1in; 
             box-sizing: border-box; 
             overflow: hidden; 
@@ -69,20 +76,18 @@ export default defineEventHandler(async (event) => {
       </html>
     `;
 
-    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}`);
+    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}. Auth token present: ${!!token}`);
     
-    // External service call using multi-layered Auth headers
-    const renderResponse: any = await $fetch(`${config.renderServiceUrl}/render-pdf`, {
+    // Strict, raw JSON fetch per requirements
+    const renderResponse: any = await $fetch(`https://puppeteer.casitaapps.com/render-pdf`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.renderServiceToken}`,
-        'x-api-key': config.renderServiceToken,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
       body: {
         html: fullHtml,
-        filename: filename,
-        token: config.renderServiceToken 
+        filename: filename
       }
     });
 

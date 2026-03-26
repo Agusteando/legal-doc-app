@@ -11,9 +11,6 @@ export default defineEventHandler(async (event) => {
   if (body.approval_1_status !== undefined) { updates.push('approval_1_status = ?'); values.push(body.approval_1_status); }
   if (body.approval_2_name !== undefined) { updates.push('approval_2_name = ?'); values.push(body.approval_2_name); }
   if (body.approval_2_status !== undefined) { updates.push('approval_2_status = ?'); values.push(body.approval_2_status); }
-  
-  // Wipe legacy override column to guarantee deterministic pipeline
-  updates.push('manual_html_override = NULL');
 
   if (updates.length > 0) {
     values.push(body.id);
