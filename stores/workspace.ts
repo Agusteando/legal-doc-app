@@ -22,8 +22,6 @@ export const useWorkspaceStore = defineStore('workspace', {
       selectedPageIds: new Set<string>(),
       lastSelectedId: null as string | null,
       
-      viewMode: 'review' as 'review' | 'editor',
-      
       isUploading: false,
       uploadStatusText: '',
       uploadProgress: 0,
@@ -59,9 +57,6 @@ export const useWorkspaceStore = defineStore('workspace', {
     updateReviewerPref(name: string) {
       this.reviewerPref = name;
       if (typeof window !== 'undefined') localStorage.setItem('reviewerPref', name);
-    },
-    setViewMode(mode: 'review' | 'editor') {
-      this.viewMode = mode;
     },
     async fetchWorkspace() {
       this.isLoadingWorkspace = true;

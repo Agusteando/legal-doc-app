@@ -32,8 +32,16 @@
           :class="workspace.selectedPageIds.has(page.id) ? 'border-blue-500/50 bg-blue-600/10' : 'border-transparent hover:bg-slate-800/60'"
         >
           <!-- Thumb -->
-          <div class="w-10 h-14 bg-slate-900 border border-slate-700/80 rounded overflow-hidden shrink-0 relative shadow-sm flex items-center justify-center">
-            <img :src="page.image_url" class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" :style="{ transform: `rotate(${page.rotation}deg)` }" />
+          <div class="w-10 h-14 bg-slate-800 border border-slate-700/80 rounded overflow-hidden shrink-0 relative shadow-sm flex items-center justify-center">
+            <!-- Lazy Native Skeleton Image -->
+            <img 
+              :src="page.image_url" 
+              loading="lazy" 
+              decoding="async" 
+              @load="$event.target.classList.remove('opacity-0')"
+              class="w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+              :style="{ transform: `rotate(${page.rotation}deg)` }" 
+            />
             <div v-if="page.is_excluded" class="absolute inset-0 bg-slate-950/70 flex items-center justify-center"><BanIcon class="w-4 h-4 text-red-500/80" /></div>
             <div v-if="page.job_status === 'processing'" class="absolute inset-0 bg-blue-900/40 flex items-center justify-center"><LoaderIcon class="w-3 h-3 text-white animate-spin"/></div>
             <div v-if="page.job_status === 'error'" class="absolute inset-0 bg-red-900/60 flex items-center justify-center"><AlertCircleIcon class="w-3 h-3 text-white"/></div>

@@ -17,24 +17,6 @@
         </div>
       </div>
       
-      <!-- Core Workflow Switcher -->
-      <div class="flex bg-slate-900 p-1.5 rounded-lg border border-slate-800 shadow-inner">
-        <button 
-          @click="workspace.setViewMode('review')" 
-          :class="workspace.viewMode === 'review' ? 'bg-slate-700 text-white shadow-sm ring-1 ring-slate-600' : 'text-slate-400 hover:text-slate-200'" 
-          class="px-5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center">
-          <LayoutIcon class="w-4 h-4 mr-2" />
-          Page Review
-        </button>
-        <button 
-          @click="workspace.setViewMode('editor')" 
-          :class="workspace.viewMode === 'editor' ? 'bg-slate-700 text-white shadow-sm ring-1 ring-slate-600' : 'text-slate-400 hover:text-slate-200'" 
-          class="px-5 py-1.5 rounded-md text-sm font-medium transition-all flex items-center">
-          <FileSignatureIcon class="w-4 h-4 mr-2" />
-          Composed Output
-        </button>
-      </div>
-
       <!-- Export Action -->
       <div>
         <button @click="exportPdf" :disabled="isExporting" 
@@ -46,12 +28,15 @@
       </div>
     </header>
 
-    <!-- Dynamic Workspace Area -->
+    <!-- Unified 3-Pane Workspace Area -->
     <div class="flex flex-1 min-h-0 relative">
-      <PageStrip class="w-[260px] border-r border-slate-800 bg-slate-950 flex-shrink-0" />
+      <PageStrip class="w-[260px] border-r border-slate-800 flex-shrink-0 z-20" />
       
-      <DetailView v-if="workspace.viewMode === 'review'" class="flex-1 min-w-0" />
-      <DocumentEditor v-if="workspace.viewMode === 'editor'" class="flex-1 min-w-0" />
+      <!-- Middle Pane: Source & Context Validation -->
+      <DetailView class="w-[30%] min-w-[400px] max-w-[500px] border-r border-slate-800 flex-shrink-0 z-10 shadow-2xl" />
+      
+      <!-- Right Pane: English Translation & WYSIWYG Canvas -->
+      <DocumentEditor class="flex-1 min-w-0 z-0 bg-slate-200" />
       
       <!-- Upload Overlay -->
       <div v-if="workspace.isUploading" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center text-white">
@@ -67,7 +52,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { DownloadCloudIcon, LoaderIcon, FilesIcon, LayoutIcon, FileSignatureIcon } from 'lucide-vue-next';
+import { DownloadCloudIcon, LoaderIcon, FilesIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import PageStrip from './PageStrip.vue';
 import DetailView from './DetailView.vue';
