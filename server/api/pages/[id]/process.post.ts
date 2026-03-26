@@ -76,10 +76,14 @@ export default defineEventHandler(async (event) => {
   if (!pages.length) throw createError({ statusCode: 404, statusMessage: 'Page not found in database.' });
 
   const start = Date.now();
+  console.log(`[Processing Pipeline] START - Page ID: ${id}`);
+  
   await db.query(`UPDATE pages SET job_status = 'processing', job_error = NULL WHERE id = ?`, [id]);
 
   try {
     const imageUrl = pages[0].image_url;
+    console.log(`[Processing Pipeline] Fetching image for Base64 conversion...`);
+    
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) throw new Error(`Fetch error: ${imageResponse.statusText}`);
     
@@ -88,7 +92,8 @@ export default defineEventHandler(async (event) => {
     const mimeType = imageResponse.headers.get('content-type') || 'image/png';
     const base64ImageUrl = `data:${mimeType};base64,${base64String}`;
 
-    // Maintain GPT-5.4 requirement per strict instructions
+    console.log(`[Processing Pipeline] Dispatching Structured Outputs request to GPT-5.4...`);
+
     const response = await openai.chat.completions.create({
       model: "gpt-5.4",
       reasoning_effort: "medium",
@@ -105,13 +110,15 @@ export default defineEventHandler(async (event) => {
       ],
       response_format: {
         type: "json_schema",
-        json_schema: { name: "legal_translation", strict: true, schema }
+        json_schema: { name: "legal_extraction", strict: true, schema }
       }
     });
 
     const jsonStr = response.choices[0].message.content || '{}';
     const parsed = JSON.parse(jsonStr);
     const duration = Math.round((Date.now() - start) / 1000);
+
+    console.log(`[Processing Pipeline] SUCCESS - Model responded. Prompt Tokens: ${response.usage?.prompt_tokens}, Completion Tokens: ${response.usage?.completion_tokens}. Time: ${duration}s`);
 
     await db.query(`
       UPDATE pages 
@@ -120,11 +127,16 @@ export default defineEventHandler(async (event) => {
       WHERE id = ?
     `,[duration, jsonStr, parsed.source_text, parsed.translated_text, id]);
 
+    console.log(`[Processing Pipeline] DB SAVE SUCCESS - UI State Synchronized.`);
+
     return { success: true, json: parsed };
 
   } catch (error: any) {
     const duration = Math.round((Date.now() - start) / 1000);
     const errorMessage = error.message || 'An unknown error occurred';
+    
+    console.error(`[Processing Pipeline] FATAL ERROR - Page ID: ${id} after ${duration}s. Details: ${errorMessage}`);
+    
     await db.query(`UPDATE pages SET job_status = 'error', job_duration_sec = ?, job_error = ? WHERE id = ?`, [duration, errorMessage, id]);
     throw createError({ statusCode: 500, statusMessage: errorMessage });
   }

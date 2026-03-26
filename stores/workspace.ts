@@ -286,22 +286,32 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
     async processSelected() {
       const ids = Array.from(this.selectedPageIds);
+      this.log('info', `Processing requested for ${ids.length} page(s).`);
+      
       for (const id of ids) {
         const page = this.pages.find(p => p.id === id);
         if (!page) continue;
+        
         page.job_status = 'processing';
         page.job_duration_sec = 0;
+        
         const timer = setInterval(() => page.job_duration_sec++, 1000);
+        this.log('info', `Page ID ${id}: Vision workflow dispatch to GPT-5.4.`);
+
         try {
           const res: any = await $fetch(`/api/pages/${id}/process`, { method: 'POST' });
+          
           page.job_status = 'completed';
           page.is_stale = false;
           page.extracted_json = JSON.stringify(res.json, null, 2);
           page.source_text = res.json.source_text;
           page.translated_text = res.json.translated_text;
+
+          this.log('success', `Page ID ${id}: Extracted legal layout successfully.`);
         } catch (e: any) {
           page.job_status = 'error';
           page.job_error = e.data?.statusMessage || e.message;
+          this.log('error', `Page ID ${id}: extraction error: ${page.job_error}`);
         } finally {
           clearInterval(timer);
         }

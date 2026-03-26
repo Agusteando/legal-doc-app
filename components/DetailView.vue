@@ -36,16 +36,24 @@
         @mouseleave="isZoomed = false; transformOrigin = '50% 50%'"
         @mousemove="onMouseMove"
       >
-        <!-- Progressive Loader -->
-        <div v-if="imageLoading" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <!-- Progressive Loader (Shows only on mount/src change, not on process status change) -->
+        <div v-if="imageLoading" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <LoaderIcon class="w-6 h-6 text-slate-600 animate-spin" />
         </div>
         
+        <!-- Processing indicator overlay (overlayed over image, image stays visible) -->
+        <div v-if="page.job_status === 'processing'" class="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 pointer-events-none backdrop-blur-[1px]">
+          <div class="bg-slate-800/90 px-4 py-2 rounded-lg border border-slate-700 flex items-center space-x-2 shadow-2xl">
+            <LoaderIcon class="w-4 h-4 text-blue-500 animate-spin" />
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-200">Processing with GPT-5.4</span>
+          </div>
+        </div>
+
         <div v-if="page.is_excluded" class="absolute inset-0 z-20 pointer-events-none flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px]">
           <span class="text-xs font-bold tracking-widest bg-red-600/90 text-white px-3 py-1.5 rounded shadow-lg border border-red-500">EXCLUDED</span>
         </div>
 
-        <!-- Scale Wrapper ensures panning maps precisely 1:1 with cursor percentage without DOM redraw jitter -->
+        <!-- Scale Wrapper ensures panning maps precisely 1:1 with cursor percentage -->
         <div 
           class="w-full h-full will-change-transform flex items-center justify-center"
           :style="{ 
@@ -57,7 +65,7 @@
           <img 
             :src="page.image_url" 
             @load="imageLoading = false"
-            class="block max-w-full max-h-full object-contain pointer-events-none drop-shadow-2xl transition-transform duration-300"
+            class="block max-w-full max-h-full object-contain pointer-events-none drop-shadow-2xl transition-opacity duration-300"
             :class="imageLoading ? 'opacity-0' : 'opacity-100'"
             :style="{ transform: `rotate(${page.rotation}deg)` }"
             draggable="false"
@@ -118,23 +126,34 @@ const localStatus = ref('pending_review');
 const dirtyFlags = reactive({ source: false, translated: false, json: false });
 const isDirty = computed(() => dirtyFlags.source || dirtyFlags.translated);
 
-watch(() => page.value, (p) => {
-  if (p) {
-    localSource.value = p.source_text || '';
-    localTranslation.value = p.translated_text || '';
-    localJson.value = p.extracted_json ? JSON.stringify(JSON.parse(p.extracted_json), null, 2) : '';
-    localStatus.value = p.status || 'pending_review';
-    dirtyFlags.source = false;
-    dirtyFlags.translated = false;
-    dirtyFlags.json = false;
+// FIX STATE REGRESSION: Watching the ID explicitly instead of deep object watch.
+// Deep watch reset imageLoading to true every time job_status toggled, making the image disappear.
+watch(() => page.value?.id, (newId, oldId) => {
+  if (!newId) return;
+  const p = page.value;
+  localSource.value = p.source_text || '';
+  localTranslation.value = p.translated_text || '';
+  localJson.value = p.extracted_json ? JSON.stringify(JSON.parse(p.extracted_json), null, 2) : '';
+  localStatus.value = p.status || 'pending_review';
+  dirtyFlags.source = false;
+  dirtyFlags.translated = false;
+  dirtyFlags.json = false;
+
+  // Only reset loader if the actual document ID changed or the image_url changes
+  if (newId !== oldId) {
     imageLoading.value = true;
   }
-}, { immediate: true, deep: true });
+}, { immediate: true });
 
-watch(localSource, (val) => { if(page.value) dirtyFlags.source = val !== (page.value.source_text || ''); });
-watch(localTranslation, (val) => { if(page.value) dirtyFlags.translated = val !== (page.value.translated_text || ''); });
+// Listen to rotation / URL changes independently without dumping inputs
+watch(() => page.value?.image_url, () => {
+  if (page.value) imageLoading.value = true;
+});
+
+watch(localSource, (val) => { if (page.value) dirtyFlags.source = val !== (page.value.source_text || ''); });
+watch(localTranslation, (val) => { if (page.value) dirtyFlags.translated = val !== (page.value.translated_text || ''); });
 watch(localJson, (val) => { 
-  if(page.value) {
+  if (page.value) {
     const orig = page.value.extracted_json ? JSON.stringify(JSON.parse(page.value.extracted_json), null, 2) : '';
     dirtyFlags.json = val !== orig; 
   }
@@ -144,7 +163,6 @@ const toggleTab = (tabName) => {
   activeTab.value = activeTab.value === tabName ? null : tabName;
 };
 
-// Math uses the static unscaled bounding container for absolute jitter-free panning
 const onMouseMove = (e) => {
   if (!isZoomed.value || !zoomContainer.value) return;
   const rect = zoomContainer.value.getBoundingClientRect();
@@ -178,7 +196,7 @@ const saveReview = async () => {
         const compactJson = JSON.stringify(res.json, null, 2);
         localJson.value = compactJson;
         await workspace.updatePageInfo(page.value.id, { extracted_json: compactJson, is_stale: false });
-      } catch(e) { console.warn("Background layout sync failed:", e.message); }
+      } catch (e) { console.warn("Background layout sync failed:", e.message); }
     }
     dirtyFlags.source = false;
     dirtyFlags.translated = false;
