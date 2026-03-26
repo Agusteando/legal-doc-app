@@ -44,16 +44,29 @@ const schema = {
           },
           source_content: { type: "string" },
           translated_content: { type: "string" },
-          form_label: { type: "string" },
-          form_value: { type: "string" },
-          table_data: {
+          source_form_label: { type: "string" },
+          translated_form_label: { type: "string" },
+          source_form_value: { type: "string" },
+          translated_form_value: { type: "string" },
+          source_table_data: {
             type: "array",
             items: { 
               type: "array", 
               items: { type: "string" } 
             }
           },
-          list_items: {
+          translated_table_data: {
+            type: "array",
+            items: { 
+              type: "array", 
+              items: { type: "string" } 
+            }
+          },
+          source_list_items: {
+            type: "array",
+            items: { type: "string" }
+          },
+          translated_list_items: {
             type: "array",
             items: { type: "string" }
           }
@@ -68,10 +81,14 @@ const schema = {
           "indentation",
           "source_content", 
           "translated_content", 
-          "form_label", 
-          "form_value", 
-          "table_data",
-          "list_items"
+          "source_form_label", 
+          "translated_form_label", 
+          "source_form_value", 
+          "translated_form_value",
+          "source_table_data",
+          "translated_table_data",
+          "source_list_items",
+          "translated_list_items"
         ],
         additionalProperties: false
       }
@@ -89,7 +106,8 @@ CRITICAL HARD REQUIREMENTS:
 3. ALIGNMENT & JUSTIFICATION: Standard legal body paragraphs MUST be classified as \`justify\`. Only use \`center\`, \`left\`, or \`right\` when a block is explicitly and distinctly offset from standard legal flow.
 4. TYPOGRAPHIC HIERARCHY: Identify headers, titles, and body text explicitly using \`font_size\` and \`font_weight\`.
 5. TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings ONLY when mapping physical breaks in elements like addresses, lists, or signatures. For continuous paragraph text, let the text flow without forcing breaks.
-6. NO DECORATIONS: Do not invent fake separators or aesthetics. Extract legible text ONLY.`;
+6. NO DECORATIONS: Do not invent fake separators or aesthetics. Extract legible text ONLY.
+7. BILINGUAL COMPLETENESS (CRITICAL): Every structural element MUST strictly separate the original Spanish source text from the translated English text. Populate \`source_list_items\` AND \`translated_list_items\`, \`source_table_data\` AND \`translated_table_data\`, \`source_form_label\` AND \`translated_form_label\`, etc. Never mix Spanish and English languages in the translated fields.`;
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;

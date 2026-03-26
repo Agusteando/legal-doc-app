@@ -1,6 +1,7 @@
 // Enforces strict legal document formatting, prioritizing exact visual reproduction.
 // Moves layout responsibility away from AI guesses to a deterministic renderer.
 // Enforces 8.5x13 (Tamaño Oficio) sizing constraints and professional typographic justification.
+// Guarantees pure English final output by strictly rendering translated_* structured data fields.
 
 /**
  * Strips leaked JSON artifacts (e.g., `},{`, `"}`, `{"`) from the LLM output 
@@ -73,21 +74,27 @@ export function renderLayoutBlock(block: any): string {
       html = `<hr style="margin-top: ${mt}; margin-bottom: ${mb}; margin-left: ${ml}; border: none; border-top: 1px solid #000;" />`;
       break;
     case 'form_field':
-      // Clean artifacts and ensure exactly ONE colon at the end of the label
-      let label = cleanText(block.form_label);
+      // Prefer new strict bilingual schema, fallback to legacy fields if needed
+      let rawLabel = block.translated_form_label || block.form_label || '';
+      let label = cleanText(rawLabel);
       if (label) {
         label = label.replace(/:+$/, '') + ':';
       }
-      const val = cleanText(block.form_value);
+      const rawVal = block.translated_form_value || block.form_value || '';
+      const val = cleanText(rawVal);
       html = `<div style="${baseStyle}"><strong>${label}</strong> ${val}</div>`;
       break;
     case 'list':
       const listPos = alignVal === 'center' ? 'inside' : 'outside';
       // Lists require inner padding for bullets.
       const listMl = block.indentation && block.indentation !== 'none' ? ml : '24pt';
+      
+      let listItems = block.translated_list_items;
+      if (!listItems || listItems.length === 0) listItems = block.list_items; // Legacy fallback
+
       html += `<ul style="${baseStyle} margin-left: ${listMl}; list-style-position: ${listPos}; list-style-type: disc;">`;
-      if (block.list_items && Array.isArray(block.list_items)) {
-        block.list_items.forEach((rawItem: string) => {
+      if (listItems && Array.isArray(listItems)) {
+        listItems.forEach((rawItem: string) => {
           const item = cleanText(rawItem).replace(/\n/g, '<br/>');
           html += `<li style="margin-bottom: 4pt; text-align: left;">${item}</li>`;
         });
@@ -95,9 +102,12 @@ export function renderLayoutBlock(block: any): string {
       html += `</ul>`;
       break;
     case 'table':
-      if (block.table_data && Array.isArray(block.table_data)) {
+      let tData = block.translated_table_data;
+      if (!tData || tData.length === 0) tData = block.table_data; // Legacy fallback
+
+      if (tData && Array.isArray(tData)) {
         html += `<table style="width: 100%; border-collapse: collapse; margin-top: ${mt}; margin-bottom: ${mb}; margin-left: ${ml}; font-family: 'Times New Roman', Times, serif; font-size: 10pt; color: #000; page-break-inside: auto;"><tbody>`;
-        block.table_data.forEach((row: any, i: number) => {
+        tData.forEach((row: any, i: number) => {
           html += `<tr style="page-break-inside: avoid; page-break-after: auto;">`;
           if (Array.isArray(row)) {
             row.forEach((rawCell: any) => {

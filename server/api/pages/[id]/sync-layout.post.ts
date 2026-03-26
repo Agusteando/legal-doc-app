@@ -10,21 +10,82 @@ const schema = {
       items: {
         type: "object",
         properties: {
-          type: { type: "string", enum:["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field", "handwritten_note", "list"] },
-          alignment: { type: "string", enum: ["left", "center", "right", "justify"] },
-          spacing_before: { type: "string", enum: ["none", "small", "medium", "large", "xlarge"] },
-          spacing_after: { type: "string", enum: ["none", "small", "medium", "large", "xlarge"] },
-          font_size: { type: "string", enum: ["small", "normal", "large", "xlarge"] },
-          font_weight: { type: "string", enum: ["normal", "bold"] },
-          indentation: { type: "string", enum: ["none", "small", "medium", "large"] },
+          type: { 
+            type: "string", 
+            enum:["heading", "paragraph", "signature", "stamp", "table", "divider", "form_field", "handwritten_note", "list"] 
+          },
+          alignment: { 
+            type: "string", 
+            enum: ["left", "center", "right", "justify"]
+          },
+          spacing_before: {
+            type: "string",
+            enum: ["none", "small", "medium", "large", "xlarge"]
+          },
+          spacing_after: {
+            type: "string",
+            enum: ["none", "small", "medium", "large", "xlarge"]
+          },
+          font_size: {
+            type: "string",
+            enum: ["small", "normal", "large", "xlarge"]
+          },
+          font_weight: {
+            type: "string",
+            enum: ["normal", "bold"]
+          },
+          indentation: {
+            type: "string",
+            enum: ["none", "small", "medium", "large"]
+          },
           source_content: { type: "string" },
           translated_content: { type: "string" },
-          form_label: { type: "string" },
-          form_value: { type: "string" },
-          table_data: { type: "array", items: { type: "array", items: { type: "string" } } },
-          list_items: { type: "array", items: { type: "string" } }
+          source_form_label: { type: "string" },
+          translated_form_label: { type: "string" },
+          source_form_value: { type: "string" },
+          translated_form_value: { type: "string" },
+          source_table_data: {
+            type: "array",
+            items: { 
+              type: "array", 
+              items: { type: "string" } 
+            }
+          },
+          translated_table_data: {
+            type: "array",
+            items: { 
+              type: "array", 
+              items: { type: "string" } 
+            }
+          },
+          source_list_items: {
+            type: "array",
+            items: { type: "string" }
+          },
+          translated_list_items: {
+            type: "array",
+            items: { type: "string" }
+          }
         },
-        required:["type", "alignment", "spacing_before", "spacing_after", "font_size", "font_weight", "indentation", "source_content", "translated_content", "form_label", "form_value", "table_data", "list_items"],
+        required:[
+          "type", 
+          "alignment",
+          "spacing_before",
+          "spacing_after",
+          "font_size",
+          "font_weight",
+          "indentation",
+          "source_content", 
+          "translated_content", 
+          "source_form_label", 
+          "translated_form_label", 
+          "source_form_value", 
+          "translated_form_value",
+          "source_table_data",
+          "translated_table_data",
+          "source_list_items",
+          "translated_list_items"
+        ],
         additionalProperties: false
       }
     }
@@ -50,7 +111,7 @@ export default defineEventHandler(async (event) => {
       messages:[
         { 
           role: "system", 
-          content: "You are a legal layout packager. Take the provided manually edited text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Focus entirely on accurate structural tagging (type: heading, paragraph, table). Do not try to micromanage precise margins or fonts, as the downstream rendering pipeline enforces strict legal Oficio dimensions. Standard paragraphs MUST use `justify` alignment. NEVER include JSON syntax artifacts like `},{` inside text strings." 
+          content: "You are a legal layout packager. Take the provided manually edited English text and map it directly into the strict JSON layout_blocks schema. Focus entirely on accurate structural tagging (type: heading, paragraph, table). Do not try to micromanage precise margins or fonts. Standard paragraphs MUST use `justify` alignment. NEVER include JSON syntax artifacts like `},{` inside text strings. CRITICAL BILINGUAL BEHAVIOR: Place the English text into the `translated_*` fields (e.g., `translated_list_items`, `translated_table_data`, `translated_form_label`) and leave the `source_*` fields empty if you don't have the original source." 
         },
         { role: "user", content: `Repackage this text into layout blocks:\n\n${body.translated_text}` }
       ],
