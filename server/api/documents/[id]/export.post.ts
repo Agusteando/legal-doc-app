@@ -4,7 +4,9 @@ import { renderLayoutBlock } from '../../../../utils/renderer';
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
   const db = getDb();
-  const token = process.env.RENDER_SERVICE_TOKEN;
+  
+  // 1. Strictly read token directly from the environment variable
+  const token = process.env.RENDER_SERVICE_TOKEN || '';
 
   try {
     const [docs]: any = await db.query(`SELECT * FROM documents WHERE id = ? LIMIT 1`, [id]);
@@ -38,7 +40,9 @@ export default defineEventHandler(async (event) => {
           } else {
              innerHtml += `<p style="font-family:'Times New Roman', Times, serif; font-size:11pt;">${data.translated_text || ''}</p>`;
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error(`[Export] Failed to parse JSON for page ${page.id}`);
+        }
       }
       innerHtml += `</div>\n`;
     }
@@ -76,9 +80,11 @@ export default defineEventHandler(async (event) => {
       </html>
     `;
 
-    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}. Auth token present: ${!!token}`);
+    // 2. Safely log the presence of the auth token without exposing the full secret
+    const maskedToken = token ? `${token.substring(0, 4)}...${token.slice(-4)}` : 'MISSING';
+    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}. Auth Token: Bearer ${maskedToken}`);
     
-    // Strict, raw JSON fetch per requirements
+    // 3. Strict, raw JSON fetch per requirements
     const renderResponse: any = await $fetch(`https://puppeteer.casitaapps.com/render-pdf`, {
       method: 'POST',
       headers: {
@@ -91,14 +97,16 @@ export default defineEventHandler(async (event) => {
       }
     });
 
-    if (!renderResponse.success || !renderResponse.url) {
-      throw new Error(renderResponse.error || "Render service failed to return a valid PDF URL.");
+    // 4. Validate and return the exact URL from the JSON response
+    if (!renderResponse || !renderResponse.success || !renderResponse.url) {
+      throw new Error(renderResponse?.error || "Render service failed to return a valid PDF URL.");
     }
 
+    console.log(`[Export Pipeline] Render successful. URL: ${renderResponse.url}`);
     return { success: true, url: renderResponse.url };
 
   } catch (err: any) {
-    console.error("External Render Service Error:", err.message);
-    throw createError({ statusCode: 500, statusMessage: err.message });
+    console.error(`[Export Pipeline Error]`, err.message || err);
+    throw createError({ statusCode: 500, statusMessage: err.message || "Export failed" });
   }
 });
