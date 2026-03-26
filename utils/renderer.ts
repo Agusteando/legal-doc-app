@@ -47,7 +47,11 @@ export function renderLayoutBlock(block: any): string {
       html = `<hr style="margin-top: ${mt}; margin-bottom: ${mb}; margin-left: ${ml}; border: none; border-top: 1px solid #000;" />`;
       break;
     case 'form_field':
-      html = `<div style="${baseStyle} ${align}"><strong>${block.form_label || ''}:</strong> ${block.form_value || ''}</div>`;
+      // FIX: Ensure colon is only appended if not already present from the AI extraction
+      let label = (block.form_label || '').trim();
+      if (label && !label.endsWith(':')) label += ':';
+      
+      html = `<div style="${baseStyle} ${align}"><strong>${label}</strong> ${block.form_value || ''}</div>`;
       break;
     case 'list':
       const listPos = block.alignment === 'center' ? 'inside' : 'outside';

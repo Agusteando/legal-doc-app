@@ -19,7 +19,8 @@ export default defineEventHandler(async (event) => {
     const db = getDb();
     const pageId = randomUUID();
 
-    const [orderRes]: any = await db.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM pages WHERE document_id = ?`, [document_id]);
+    // Calculate next_order explicitly ignoring deleted rows to prevent ghost jumps
+    const [orderRes]: any = await db.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM pages WHERE document_id = ? AND is_deleted = FALSE`, [document_id]);
     const nextOrder = orderRes[0].next_order;
 
     await db.query(

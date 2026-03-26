@@ -100,17 +100,23 @@ const getCompiledHtml = (p) => {
   }
 };
 
-watch(() => page.value, async (newPage) => {
-  if (!newPage) return;
-  await nextTick();
-  if (editorRef.value) {
-    if (newPage.manual_html_override) {
-      editorRef.value.innerHTML = newPage.manual_html_override;
-    } else {
-      editorRef.value.innerHTML = getCompiledHtml(newPage) || '<div style="color:#94a3b8; font-style:italic; text-align:center;">Awaiting page compilation data...</div>';
+// FIX: Explictly watch extracted_json and manual_html_override in addition to ID, 
+// so the layout auto-refreshes the instant GPT-5.4 processing completes.
+watch(
+  [() => page.value?.id, () => page.value?.extracted_json, () => page.value?.manual_html_override], 
+  async ([newId, newJson, newOverride]) => {
+    if (!page.value) return;
+    await nextTick();
+    if (editorRef.value) {
+      if (newOverride) {
+        editorRef.value.innerHTML = newOverride;
+      } else {
+        editorRef.value.innerHTML = getCompiledHtml(page.value) || '<div style="color:#94a3b8; font-style:italic; text-align:center;">Awaiting page compilation data...</div>';
+      }
     }
-  }
-}, { immediate: true });
+  }, 
+  { immediate: true }
+);
 
 const resetToAuto = async () => {
   if (!page.value) return;

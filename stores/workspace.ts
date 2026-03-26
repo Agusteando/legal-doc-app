@@ -84,6 +84,28 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.reviewerPref = name;
       if (typeof window !== 'undefined') localStorage.setItem('reviewerPref', name);
     },
+    
+    // FIX: Core normalization function to eliminate ghost numbering from deleted pages.
+    // Enforces contiguous indexing 1, 2, 3... N strictly on currently active items.
+    async normalizeSortOrder() {
+      const active = this.orderedPages;
+      let changed = false;
+      
+      active.forEach((p, index) => {
+        const expectedOrder = index + 1;
+        if (p.sort_order !== expectedOrder) {
+          p.sort_order = expectedOrder;
+          changed = true;
+        }
+      });
+      
+      if (changed) {
+        const updates = active.map(p => ({ id: p.id, sort_order: p.sort_order }));
+        // Quietly sync continuous sequence back to DB
+        $fetch('/api/pages/update', { method: 'PUT', body: { updates } }).catch(e => console.error(e));
+      }
+    },
+
     async fetchWorkspace() {
       this.isLoadingWorkspace = true;
       try {
@@ -91,6 +113,11 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (data.stats) this.globalStats = data.stats;
         if (data && data.document) {
           this.pages = data.pages || [];
+          
+          if (this.pages.length > 0) {
+            await this.normalizeSortOrder(); // Collapse any gaps from deleted ghosts
+          }
+
           if (this.pages.length && !this.lastSelectedId) {
             this.selectPage(this.orderedPages[0]?.id, false, false);
           }
@@ -192,7 +219,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         }
         
         this.uploadStatusText = 'Finalizing Assembly...';
-        await this.fetchWorkspace();
+        await this.fetchWorkspace(); // Re-pulls latest from DB
         
         if (insertAfterId && uploadedIds.length > 0) {
            const list = [...this.orderedPages];
@@ -209,9 +236,11 @@ export const useWorkspaceStore = defineStore('workspace', {
                  filteredList.push(...newPages);
               }
            }
-           await this.updatePageOrder(filteredList.map(p => p.id));
-           await this.fetchWorkspace();
+           await this.updatePageOrder(filteredList.map(p => p.id)); // Normalizes and updates DB
+        } else {
+           await this.normalizeSortOrder(); // Ensure contiguous numbering
         }
+        await this.fetchWorkspace();
       } catch (err: any) { 
         this.log('error', `FATAL Upload Sequence Error: ${err.message}`);
         alert('Upload Sequence Failed: ' + (err.message || 'Server error')); 
@@ -297,6 +326,8 @@ export const useWorkspaceStore = defineStore('workspace', {
               filteredList.splice(targetIdx + 1, 0, ...newPages);
               await this.updatePageOrder(filteredList.map(p => p.id));
            }
+        } else {
+           await this.normalizeSortOrder();
         }
         
         await this.fetchWorkspace();
@@ -389,6 +420,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       });
       const updates = this.pages.map(p => ({ id: p.id, sort_order: p.sort_order }));
       await $fetch('/api/pages/update', { method: 'PUT', body: { updates } });
+      await this.normalizeSortOrder(); // Ensure complete continuous sequence post-drag
     },
     async deletePage(id: string) {
       const page = this.pages.find(p => p.id === id);
@@ -398,6 +430,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (this.lastSelectedId === id) this.lastSelectedId = null;
         
         await $fetch('/api/pages/update', { method: 'PUT', body: { id, is_deleted: true } });
+        await this.normalizeSortOrder(); // Instantly collapse numbering gaps
         
         if (this.pages.every(p => p.is_deleted)) {
           this.fetchWorkspace();
