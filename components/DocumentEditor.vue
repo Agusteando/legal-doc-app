@@ -47,8 +47,8 @@
         ref="editorRef"
         contenteditable="true" 
         @input="onInput"
-        class="bg-white shadow-xl ring-1 ring-slate-900/10 w-[8.5in] min-h-[13in] max-w-full p-[1in] focus:outline-none transition-shadow hover:shadow-2xl"
-        style="box-sizing: border-box; font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.15; font-size: 11pt;">
+        class="bg-white shadow-xl ring-1 ring-slate-900/10 focus:outline-none transition-shadow hover:shadow-2xl mx-auto"
+        style="width: 8.5in; min-height: 13in; max-width: 100%; padding: 1in; box-sizing: border-box; font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.5; font-size: 11pt; text-align: justify; text-justify: inter-word;">
       </div>
     </div>
   </div>
@@ -91,7 +91,7 @@ const getCompiledHtml = (p) => {
     if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
       data.layout_blocks.forEach(block => { html += renderLayoutBlock(block); });
     } else { 
-      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; color: #000; line-height: 1.15;">${data.translated_text || ''}</div>`; 
+      html = `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; color: #000; line-height: 1.5; text-align: justify;">${data.translated_text || ''}</div>`; 
     }
     // Allow pure styling to persist securely through DOMPurify
     return DOMPurify.sanitize(html, { ADD_ATTR: ['style'] });
@@ -100,8 +100,6 @@ const getCompiledHtml = (p) => {
   }
 };
 
-// FIX: Explictly watch extracted_json and manual_html_override in addition to ID, 
-// so the layout auto-refreshes the instant GPT-5.4 processing completes.
 watch(
   [() => page.value?.id, () => page.value?.extracted_json, () => page.value?.manual_html_override], 
   async ([newId, newJson, newOverride]) => {

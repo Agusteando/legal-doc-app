@@ -4,28 +4,22 @@ import { renderLayoutBlock } from '../../../../utils/renderer';
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
   const db = getDb();
-  
-  const token = process.env.RENDER_SERVICE_TOKEN || '';
 
   try {
     const [docs]: any = await db.query(`SELECT * FROM documents WHERE id = ? LIMIT 1`, [id]);
-    if (!docs.length) throw new Error('Document not found.');
-    
-    const doc = docs[0];
-    const filename = doc.filename.replace(/\s+/g, '_') + '_Export.pdf';
-    
+    if (!docs.length) throw new Error('Workspace Document not found in DB.');
+    const filename = docs[0].filename.replace(/\s+/g, '_') + '_Export.pdf';
+
     const [pages]: any = await db.query(`
-      SELECT extracted_json, manual_html_override FROM pages 
+      SELECT extracted_json FROM pages 
       WHERE document_id = ? AND is_deleted = FALSE AND is_excluded = FALSE 
       ORDER BY sort_order ASC
     `, [id]);
-    
+
     let innerHtml = '';
     for (const page of pages) {
       innerHtml += `<div class="page-container">\n`;
-      if (page.manual_html_override) {
-        innerHtml += page.manual_html_override;
-      } else if (page.extracted_json) {
+      if (page.extracted_json) {
         try {
           const data = JSON.parse(page.extracted_json);
           if (data.layout_blocks && Array.isArray(data.layout_blocks)) {
@@ -34,7 +28,7 @@ export default defineEventHandler(async (event) => {
              innerHtml += `<div style="font-family:'Times New Roman', Times, serif; font-size:11pt; line-height: 1.5; color: #000; text-align: justify;">${data.translated_text || ''}</div>`;
           }
         } catch (e) {
-          console.error(`[Export] Failed to parse JSON for page ${page.id}`);
+          console.warn("Skipped invalid JSON block during export");
         }
       }
       innerHtml += `</div>\n`;
@@ -45,7 +39,10 @@ export default defineEventHandler(async (event) => {
       <html lang="en">
       <head>
         <meta charset="UTF-8">
+        <title>${filename}</title>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap');
+          
           /* Strict Print Styling - Legal Oficio Typography and Margins */
           @page { size: 8.5in 13in; margin: 1in; }
           body { 
@@ -65,7 +62,7 @@ export default defineEventHandler(async (event) => {
             width: 100%; 
             box-sizing: border-box; 
             position: relative;
-            page-break-after: always; /* Ensure pagination exactly matches the database layout */
+            page-break-after: always;
           }
           p, div { widows: 2; orphans: 2; }
           table { page-break-inside: auto; }
@@ -77,39 +74,22 @@ export default defineEventHandler(async (event) => {
       </head>
       <body>
         ${innerHtml}
+        <script>
+          // Automatically trigger print dialog once layout is fully rendered
+          window.onload = () => {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          };
+        </script>
       </body>
       </html>
     `;
 
-    const maskedToken = token ? `${token.substring(0, 4)}...${token.slice(-4)}` : 'MISSING';
-    const htmlStatus = fullHtml && fullHtml.length > 0 ? `Non-empty (${fullHtml.length} bytes)` : 'EMPTY';
-    
-    console.log(`[Export Pipeline] Dispatching Render Request for ${filename}`);
-    console.log(`[Export Pipeline] Auth Token exists: ${!!token} (Bearer ${maskedToken})`);
-    console.log(`[Export Pipeline] HTML Payload: ${htmlStatus}`);
-    
-    const renderResponse: any = await $fetch(`https://puppeteer.casitaapps.com/render-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: {
-        html: fullHtml,
-        filename: filename
-      }
-    });
-
-    if (!renderResponse || !renderResponse.success || !renderResponse.url) {
-      throw new Error(renderResponse?.error || "Render service failed to return a valid PDF URL.");
-    }
-
-    console.log(`[Export Pipeline] Render successful. Storage URL obtained: ${renderResponse.url}`);
-    
-    return { success: true, url: renderResponse.url };
+    return { success: true, html: fullHtml, filename };
 
   } catch (err: any) {
-    console.error(`[Export Pipeline Error]`, err.message || err);
-    throw createError({ statusCode: 500, statusMessage: err.message || "Export failed" });
+    console.error("Export Generation Error:", err.message);
+    throw createError({ statusCode: 500, statusMessage: err.message });
   }
 });

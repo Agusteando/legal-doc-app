@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
       messages:[
         { 
           role: "system", 
-          content: "You are a legal layout packager. Take the provided manually edited text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Preserve physical line breaks exactly using explicit \\n. Assign realistic structural blocks, font sizes, weights, and crucial vertical spacing (`spacing_before`, `spacing_after`) to ensure professional document fidelity matching typical legal hierarchy. Standard paragraphs MUST use `justify` alignment. NEVER include JSON syntax artifacts like `},{` inside text strings." 
+          content: "You are a legal layout packager. Take the provided manually edited text and map it directly into the strict JSON layout_blocks schema. Do NOT alter the text content. Focus entirely on accurate structural tagging (type: heading, paragraph, table). Do not try to micromanage precise margins or fonts, as the downstream rendering pipeline enforces strict legal Oficio dimensions. Standard paragraphs MUST use `justify` alignment. NEVER include JSON syntax artifacts like `},{` inside text strings." 
         },
         { role: "user", content: `Repackage this text into layout blocks:\n\n${body.translated_text}` }
       ],

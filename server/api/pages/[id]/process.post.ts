@@ -81,15 +81,15 @@ const schema = {
   additionalProperties: false
 };
 
-const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks prioritizing absolute structural and vertical fidelity.
+const systemPrompt = `Extract and translate the legal document page into structured JSON layout blocks prioritizing accurate structural tagging.
 
 CRITICAL HARD REQUIREMENTS:
 1. PURE TEXT, NO ARTIFACTS: NEVER leak JSON syntax (like \`},{\` or \`"]\`) into the actual text strings. Content must be pure human-readable legal text. Do not duplicate colons in form labels.
-2. VERTICAL RHYTHM & SPACING: Treat spacing as first-class layout data. Accurately capture blank-line separation and vertical gaps between distinct sections using \`spacing_before\` and \`spacing_after\`. Do NOT collapse disconnected paragraphs.
-3. ALIGNMENT & JUSTIFICATION: Standard legal body paragraphs MUST use \`justify\` alignment. Only use \`center\`, \`left\`, or \`right\` when explicitly formatted that way visually.
+2. STRUCTURAL INTENT OVER VISUALS: Map text to logical blocks (heading, paragraph, table, list, signature). Do NOT attempt to micromanage precise margins or justification, as the downstream rendering pipeline strictly enforces legal Oficio dimensions and typography. Use \`spacing_before\` and \`spacing_after\` to indicate logical separation, not literal pixels.
+3. ALIGNMENT & JUSTIFICATION: Standard legal body paragraphs MUST be classified as \`justify\`. Only use \`center\`, \`left\`, or \`right\` when a block is explicitly and distinctly offset from standard legal flow.
 4. TYPOGRAPHIC HIERARCHY: Identify headers, titles, and body text explicitly using \`font_size\` and \`font_weight\`.
-5. TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings to mirror physical document line wrapping exactly.
-6. NO DECORATIONS: Do not invent fake separators or aesthetics. Extract legible text ONLY. Exact professional reproduction is the goal.`;
+5. TRUE LINE BREAKS: Use explicit \\n characters for literal line breaks within text strings ONLY when mapping physical breaks in elements like addresses, lists, or signatures. For continuous paragraph text, let the text flow without forcing breaks.
+6. NO DECORATIONS: Do not invent fake separators or aesthetics. Extract legible text ONLY.`;
 
 export default defineEventHandler(async (event) => {
   const id = event.context.params?.id;
