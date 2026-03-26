@@ -1,11 +1,20 @@
 <template>
-  <div class="flex-1 flex flex-col h-full bg-slate-200 relative">
+  <div class="flex-1 flex flex-col h-full bg-slate-200 relative overflow-hidden text-slate-800">
     
-    <!-- Approvals Banner (Moved here where it logically belongs) -->
-    <div class="bg-slate-50 border-b border-slate-300 px-6 py-2 flex items-center justify-between shrink-0 shadow-sm z-20">
-      <div class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center">
-        <ShieldCheckIcon class="w-4 h-4 mr-2" />
-        Document Approvals
+    <!-- State Banner (Explicit Pipeline Explanation) -->
+    <div v-if="isOverride" class="bg-amber-100 border-b border-amber-300 px-6 py-2 flex items-center justify-between shrink-0 shadow-sm z-20">
+      <div class="flex items-center text-amber-900 text-sm font-medium">
+        <AlertTriangleIcon class="w-4 h-4 mr-2 text-amber-600" />
+        <span><strong>Manual Edit Mode:</strong> This document is disconnected from the review pages.</span>
+      </div>
+      <button @click="resetToAuto" class="text-xs font-semibold text-amber-800 bg-amber-200 hover:bg-amber-300 transition-colors px-3 py-1.5 rounded-md flex items-center shadow-sm border border-amber-400">
+        <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" /> Revert to Auto-Assembly
+      </button>
+    </div>
+    <div v-else class="bg-emerald-50 border-b border-emerald-200 px-6 py-2 flex items-center justify-between shrink-0 shadow-sm z-20">
+      <div class="flex items-center text-emerald-800 text-sm font-medium">
+        <LinkIcon class="w-4 h-4 mr-2 text-emerald-600" />
+        <span><strong>Auto-Assembled:</strong> Document is actively rendering from extracted page data. Edits here will detach it into Manual Mode.</span>
       </div>
       <Approvals />
     </div>
@@ -31,10 +40,6 @@
       
       <span v-if="isSaving" class="text-xs font-medium text-slate-500 flex items-center mr-4"><LoaderIcon class="w-3 h-3 mr-1 animate-spin" /> Saving...</span>
       <span v-else-if="saveSuccess" class="text-xs font-medium text-emerald-600 flex items-center mr-4"><CheckCircleIcon class="w-3 h-3 mr-1" /> Saved</span>
-      
-      <button @click="resetToAuto" class="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md flex items-center shadow-sm" title="Pulls the latest deterministic HTML from the current Review Pages.">
-        <RefreshCwIcon class="w-3.5 h-3.5 mr-1.5" /> Rebuild from Pages
-      </button>
     </div>
     
     <!-- Virtual Paper Canvas -->
@@ -57,7 +62,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { BoldIcon, ItalicIcon, UnderlineIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, ListIcon, EraserIcon, LoaderIcon, CheckCircleIcon, RefreshCwIcon, ShieldCheckIcon } from 'lucide-vue-next';
+import { BoldIcon, ItalicIcon, UnderlineIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, ListIcon, EraserIcon, LoaderIcon, CheckCircleIcon, RefreshCwIcon, AlertTriangleIcon, LinkIcon } from 'lucide-vue-next';
 import { useWorkspaceStore } from '~/stores/workspace';
 import Approvals from './Approvals.vue';
 
@@ -66,6 +71,7 @@ const editorRef = ref(null);
 const isLoading = ref(true);
 const isSaving = ref(false);
 const saveSuccess = ref(false);
+const isOverride = ref(false);
 let saveTimeout = null;
 
 const exec = (command, value = null) => {
@@ -84,14 +90,11 @@ onUnmounted(() => {
 const loadContent = async () => {
   isLoading.value = true;
   try {
-    let html = workspace.document?.manual_html_override;
-    if (!html) {
-      const res = await $fetch(`/api/documents/${workspace.document.id}/html`);
-      html = res.html;
-    }
-    await new Promise(r => setTimeout(r, 0));
+    const res = await $fetch(`/api/documents/${workspace.document.id}/html`);
+    isOverride.value = res.is_override;
+    await new Promise(r => setTimeout(r, 0)); // Yield to let DOM mount ref
     if (editorRef.value) {
-      editorRef.value.innerHTML = html || '<p><br></p>';
+      editorRef.value.innerHTML = res.html;
     }
   } catch(e) { console.error(e); }
   finally { isLoading.value = false; }
@@ -104,9 +107,11 @@ const resetToAuto = async () => {
 };
 
 const onInput = () => {
+  if (!isOverride.value) isOverride.value = true; // Visually switch mode immediately
   if (saveTimeout) clearTimeout(saveTimeout);
   saveSuccess.value = false;
   isSaving.value = true;
+  
   saveTimeout = setTimeout(async () => {
     if (editorRef.value) {
       await workspace.saveDocumentHtml(editorRef.value.innerHTML);

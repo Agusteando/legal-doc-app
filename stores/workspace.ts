@@ -323,6 +323,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         page.is_deleted = true;
         this.selectedPageIds.delete(id);
         if (this.lastSelectedId === id) this.lastSelectedId = null;
+        
         await $fetch('/api/pages/update', { method: 'PUT', body: { id, is_deleted: true } });
         
         if (this.pages.every(p => p.is_deleted)) {

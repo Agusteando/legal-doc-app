@@ -19,6 +19,8 @@ export default defineEventHandler(async (event) => {
     if (body.status !== undefined) { updates.push('status = ?'); values.push(body.status); }
     if (body.rotation !== undefined) { updates.push('rotation = ?'); values.push(body.rotation); }
     if (body.is_excluded !== undefined) { updates.push('is_excluded = ?'); values.push(body.is_excluded); }
+    // FIX: Add missing is_deleted field to make deletions durable in the database
+    if (body.is_deleted !== undefined) { updates.push('is_deleted = ?'); values.push(body.is_deleted); }
     if (body.extracted_json !== undefined) { updates.push('extracted_json = ?'); values.push(body.extracted_json); }
     if (body.source_text !== undefined) { updates.push('source_text = ?'); values.push(body.source_text); }
     if (body.translated_text !== undefined) { updates.push('translated_text = ?'); values.push(body.translated_text); }
